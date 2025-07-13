@@ -1,0 +1,37 @@
+{
+  "name": "pdn-toy-tools",
+  "version": "1.0.0",
+  "description": "Interactive Power Delivery Network Education Platform",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 8080",
+    "build": "echo 'No build process needed for static site'",
+    "test": "echo 'No tests specified yet'",
+    "deploy": "echo 'Deploy to GitHub Pages via repository settings'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aroraakarshan/pdn-toy-tools.git"
+  },
+  "keywords": [
+    "power-delivery-network",
+    "pdn",
+    "education",
+    "visualization",
+    "engineering",
+    "interactive",
+    "resistance-analysis",
+    "shortest-path",
+    "electrical-engineering",
+    "vlsi"
+  ],
+  "author": "Akarshan Arora",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aroraakarshan/pdn-toy-tools/issues"
+  },
+  "homepage": "https://aroraakarshan.github.io/pdn-toy-tools/",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

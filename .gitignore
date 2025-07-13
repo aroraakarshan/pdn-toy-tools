@@ -1,0 +1,8 @@
+# Excluded files and directories for GitHub Pages
+node_modules/
+.DS_Store
+*.log
+.vscode/
+.idea/
+*.tmp
+*.temp

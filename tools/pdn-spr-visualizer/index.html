@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDN SPR Visualizer - Interactive Shortest Path Resistance Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/visualizer.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo">
+                    <a href="../../index.html" class="back-link">
+                        <span class="back-icon">←</span>
+                    </a>
+                    <span class="logo-icon">🕸️</span>
+                    <h1>PDN SPR Visualizer</h1>
+                </div>
+                <div class="header-controls">
+                    <button id="helpBtn" class="btn btn-secondary">
+                        <span>?</span>
+                        Help
+                    </button>
+                    <button id="resetBtn" class="btn btn-secondary">
+                        <span>↻</span>
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Panel -->
+            <aside class="control-panel">
+                <div class="panel-section">
+                    <h3>Network Generation</h3>
+                    <button id="generateNetwork" class="btn btn-primary">Generate New Network</button>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Path Analysis</h3>
+                    <div class="control-group">
+                        <label for="sourceSelect">Source Instance:</label>
+                        <select id="sourceSelect">
+                            <option value="">Select source instance...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="targetSelect">Target Domain:</label>
+                        <select id="targetSelect">
+                            <option value="">Select target domain...</option>
+                        </select>
+                    </div>
+                    <button id="findPath" class="btn btn-accent">Find Shortest Path</button>
+                    <button id="clearCanvas" class="btn btn-secondary">Clear Canvas</button>
+                    <button id="animateAllPaths" class="btn btn-secondary">Show All Paths</button>
+                    <div class="control-group">
+                        <label for="numPaths">Number of Paths:</label>
+                        <input type="range" id="numPaths" min="1" max="8" step="1" value="3">
+                        <span id="pathsValue">3</span>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Animation Controls</h3>
+                    <div class="control-group">
+                        <label for="animationSpeed">Speed:</label>
+                        <input type="range" id="animationSpeed" min="0.5" max="3" step="0.1" value="1">
+                        <span id="speedValue">1x</span>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="showResistance" checked>
+                            Show Resistance Values
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Results</h3>
+                    <div id="pathResults" class="results-display">
+                        <p>Select source and target to see path analysis</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Visualization Area -->
+            <section class="visualization-area">
+                <div class="canvas-container">
+                    <div id="pdnPlot" style="width:800px;height:600px;"></div>
+                    <div id="tooltipDisplay" class="tooltip"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal" onclick="if(event.target === this) this.classList.remove('active')">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>PDN SPR Visualizer Help</h2>
+                    <button class="modal-close" onclick="document.getElementById('helpModal').classList.remove('active')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h3>What is PDN SPR Analysis?</h3>
+                    <p>Power Delivery Network (PDN) Shortest Path Resistance (SPR) analysis helps identify the lowest resistance path between instances and domains in a power delivery grid. This is crucial for understanding current flow, voltage drops, and power delivery efficiency in circuit design.</p>
+                    
+                    <h3>How to Use This Tool:</h3>
+                    <ol>
+                        <li><strong>Auto-Generated Network:</strong> The tool automatically generates a 10x10 grid with 3 domains and 7 instances</li>
+                        <li><strong>Generate New Network:</strong> Click "Generate New Network" to create a fresh random layout</li>
+                        <li><strong>Select Source:</strong> Choose a source instance from the dropdown or click on purple circles in the grid</li>
+                        <li><strong>Select Target:</strong> Choose a target domain from the dropdown or click on colored square bumps</li>
+                        <li><strong>Find Path:</strong> Click "Find Shortest Path" to see the optimal resistance path with smooth animation</li>
+                        <li><strong>Multiple Paths:</strong> Use "Show All Paths" to visualize and compare multiple alternative paths (adjust count with slider)</li>
+                    </ol>
+                    
+                    <h3>Current Features:</h3>
+                    <ul>
+                        <li><strong>Interactive Grid:</strong> 10x10 power delivery network with realistic resistance values</li>
+                        <li><strong>Domain System:</strong> 3 color-coded domains (A, B, C) with multiple bumps each</li>
+                        <li><strong>Independent Instances:</strong> 7 scattered instances as potential sources</li>
+                        <li><strong>Animated Pathfinding:</strong> Smooth particle animation showing current flow along paths</li>
+                        <li><strong>Real-time Analysis:</strong> Live resistance, current, and segment analysis during animation</li>
+                        <li><strong>Multi-Path Comparison:</strong> Visualize up to 8 different paths simultaneously</li>
+                        <li><strong>Dijkstra's Algorithm:</strong> Advanced pathfinding using actual grid resistance values</li>
+                        <li><strong>Interactive Selection:</strong> Click directly on grid elements or use dropdown menus</li>
+                        <li><strong>Animation Controls:</strong> Adjustable speed and resistance value display toggle</li>
+                    </ul>
+                    
+                    <h3>Understanding the Visualization:</h3>
+                    <ul>
+                        <li><strong>Gray Lines:</strong> Grid network connections with varying resistance</li>
+                        <li><strong>Colored Squares:</strong> Domain bumps (low resistance connection points)</li>
+                        <li><strong>Purple Circles:</strong> Independent instances (potential sources)</li>
+                        <li><strong>Green Star:</strong> Selected source instance</li>
+                        <li><strong>Orange Diamond:</strong> Selected target domain</li>
+                        <li><strong>Colored Paths:</strong> Different path options with resistance values</li>
+                        <li><strong>Golden Particles:</strong> Current flow animation along paths</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/pdn-core.js"></script>
+    <script src="assets/js/path-finding.js"></script>
+    <script src="assets/js/animation.js"></script>
+    <script src="assets/js/plotly-grid.js"></script>
+    <script src="assets/js/visualizer.js"></script>
+</body>
+</html>
