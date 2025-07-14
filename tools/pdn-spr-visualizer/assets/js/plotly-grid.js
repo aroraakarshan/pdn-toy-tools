@@ -562,6 +562,9 @@ class PlotlyGridVisualizer {
         const current = 3.3 / currentResistance;
         const resultsDiv = document.getElementById('pathResults');
         
+        // Calculate visible segments (exclude virtual connection to bump)
+        const visibleTotalSegments = totalSegments - 1; // Exclude virtual connection
+        
         let segmentInfo = '';
         if (segmentResistance !== null) {
             segmentInfo = `
@@ -573,7 +576,7 @@ class PlotlyGridVisualizer {
         
         resultsDiv.innerHTML = `
             <div class="result-item">
-                <strong>Progress:</strong> ${currentSegment}/${totalSegments} segments
+                <strong>Progress:</strong> ${currentSegment}/${visibleTotalSegments} segments
             </div>
             <div class="result-item">
                 <strong>Total Resistance:</strong> ${currentResistance.toFixed(3)} Ω
@@ -781,6 +784,10 @@ class PlotlyGridVisualizer {
     showPathResults(resistance) {
         const current = 3.3 / resistance; // Assuming 3.3V supply
         const resultsDiv = document.getElementById('pathResults');
+        
+        // Calculate visible segments (exclude virtual connection to bump)
+        const visibleSegments = this.currentPath.length - 2; // Exclude source and virtual connection
+        
         resultsDiv.innerHTML = `
             <div class="result-item">
                 <strong>Total Resistance:</strong> ${resistance.toFixed(3)} Ω
@@ -789,7 +796,7 @@ class PlotlyGridVisualizer {
                 <strong>Current:</strong> ${current.toFixed(3)} A
             </div>
             <div class="result-item">
-                <strong>Path Length:</strong> ${this.currentPath.length - 1} segments
+                <strong>Path Length:</strong> ${visibleSegments} segments
             </div>
         `;
     }
