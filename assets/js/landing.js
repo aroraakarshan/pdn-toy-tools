@@ -77,22 +77,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Smooth scrolling for navigation links
-    const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            const targetElement = document.querySelector(targetId);
-            if (targetElement) {
-                window.scrollTo({
-                    top: targetElement.offsetTop - 80, // Adjust for sticky nav height
-                    behavior: 'smooth'
-                });
-            }
-        });
-    });
-
     // Sticky navigation effect
     const nav = document.querySelector('.top-nav');
     window.addEventListener('scroll', () => {
@@ -120,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }, observerOptions);
 
-    const elementsToAnimate = document.querySelectorAll('.content-section, .tool-card, .step-card, .author-content');
+    const elementsToAnimate = document.querySelectorAll('.content-section, .tool-card, .step-card, .author-content, .benefit-card');
     elementsToAnimate.forEach(el => {
         el.style.opacity = '0';
         el.style.transform = 'translateY(20px)';
