@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         interactivity: {
-            detect_on: "canvas",
+            detect_on: "window", // Changed from "canvas"
             events: {
                 onhover: {
                     enable: true,
