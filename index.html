@@ -3,164 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDN Toy Tools - Interactive Power Delivery Network Education</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>PDN Toy Tools: Interactive Animations for PDN Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/landing.css">
 </head>
 <body>
-    <div class="background-animation">
-        <div class="grid-bg"></div>
+    <div class="background-accents">
+        <div class="circuit-lines"></div>
     </div>
 
-    <header class="hero-section">
-        <nav class="navbar">
-            <div class="nav-container">
-                <div class="logo">
-                    <span class="logo-icon">⚡</span>
-                    <span class="logo-text">PDN Toy Tools</span>
-                </div>
-                <div class="nav-links">
-                    <a href="#about">About</a>
-                    <a href="#tools">Tools</a>
-                    <a href="https://github.com/aroraakarshan/pdn-toy-tools" target="_blank">GitHub</a>
-                </div>
+    <nav class="top-nav sticky">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">Akarshan Arora</a>
+            <div class="nav-links">
+                <a href="#about-emir">About EMIR</a>
+                <a href="#tools">Tools</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#about-author">About the Author</a>
             </div>
-        </nav>
+        </div>
+    </nav>
 
+    <header class="hero-section">
         <div class="hero-content">
-            <div class="hero-text">
-                <h1 class="hero-title">
-                    Master Power Delivery Networks
-                    <span class="gradient-text">Through Interactive Visualization</span>
-                </h1>
-                <p class="hero-subtitle">
-                    Explore complex PDN concepts through beautifully animated, interactive tools designed to make power delivery network analysis intuitive and engaging for engineers and students.
-                </p>
-                <div class="hero-buttons">
-                    <a href="tools/pdn-spr-visualizer/" class="btn btn-primary">
-                        Start Learning
-                        <span class="btn-icon">→</span>
-                    </a>
-                    <a href="#about" class="btn btn-secondary">
-                        Learn More
-                    </a>
-                </div>
-            </div>
-            <div class="hero-visual">
-                <div class="pdn-preview">
-                    <svg viewBox="0 0 300 200" class="animated-circuit">
-                        <defs>
-                            <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
-                            </linearGradient>
-                        </defs>
-                        <!-- Grid -->
-                        <g class="grid-lines">
-                            <line x1="50" y1="50" x2="250" y2="50" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="50" y1="100" x2="250" y2="100" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="50" y1="150" x2="250" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="50" y1="50" x2="50" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="100" y1="50" x2="100" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="150" y1="50" x2="150" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="200" y1="50" x2="200" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                            <line x1="250" y1="50" x2="250" y2="150" stroke="#e5e7eb" stroke-width="1"/>
-                        </g>
-                        <!-- Animated path -->
-                        <path d="M50,100 L100,100 L150,50 L200,50 L250,100" 
-                              stroke="url(#pathGradient)" 
-                              stroke-width="3" 
-                              fill="none" 
-                              class="animated-path"/>
-                        <!-- Bumps -->
-                        <circle cx="50" cy="100" r="6" fill="#4f46e5" class="bump"/>
-                        <circle cx="150" cy="50" r="6" fill="#06b6d4" class="bump"/>
-                        <circle cx="250" cy="100" r="6" fill="#10b981" class="bump"/>
-                    </svg>
-                </div>
+            <h1 class="hero-title">
+                <span class="gradient-text">PDN Toy Tools</span>
+            </h1>
+            <p class="hero-tagline">Master Power Delivery Networks Through Animation</p>
+            <p class="hero-subtitle">
+                An interactive suite of tools to help VLSI engineers analyze and debug complex power delivery network issues like Electromigration (EM) and IR Drop through intuitive animations.
+            </p>
+            <div class="hero-buttons">
+                <a href="#tools" class="btn btn-primary">
+                    Explore Tools
+                    <span class="btn-icon">→</span>
+                </a>
+                <a href="https://github.com/aroraakarshan/pdn-toy-tools" target="_blank" class="btn btn-secondary">
+                    View on GitHub
+                </a>
             </div>
         </div>
     </header>
 
-    <section id="about" class="about-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Why PDN Toy Tools?</h2>
-                <p>Power Delivery Network analysis made visual, interactive, and educational</p>
+    <main>
+        <section id="about-emir" class="content-section">
+            <div class="container">
+                <h2 class="section-title">What is EMIR?</h2>
+                <p class="section-intro">
+                    EMIR (Electromigration and IR Drop) is a critical challenge in modern VLSI design. <strong>Electromigration</strong> is the gradual displacement of metal atoms in a semiconductor, which can cause interconnects to fail. <strong>IR Drop</strong> is the voltage drop in the power delivery network, which can lead to timing violations and reduced performance. These tools provide an intuitive, visual way to understand and analyze these complex phenomena.
+                </p>
             </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
-                    <h3>Interactive Learning</h3>
-                    <p>Visualize complex PDN concepts through hands-on interaction with animated network models</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Real-time Simulation</h3>
-                    <p>Watch resistance paths form dynamically with detailed animations showing current flow</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔬</div>
-                    <h3>Educational Focus</h3>
-                    <p>Designed specifically for engineering education with clear explanations and guided exploration</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3>Modern Interface</h3>
-                    <p>Beautiful, responsive design that makes complex engineering concepts accessible and engaging</p>
-                </div>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="tools" class="tools-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Available Tools</h2>
-                <p>Interactive visualizers for different PDN concepts</p>
-            </div>
-            <div class="tools-grid">
-                <div class="tool-card">
-                    <div class="tool-preview">
-                        <div class="tool-icon">🕸️</div>
-                    </div>
-                    <div class="tool-content">
+        <section id="tools" class="tools-section">
+            <div class="container">
+                <h2 class="section-title">Interactive Analysis Tools</h2>
+                <div class="tools-grid">
+                    <div class="tool-card">
+                        <div class="tool-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 21v-1.5M15.75 3v1.5M12 4.5v-1.5m0 18v-1.5M15.75 21v-1.5m-1.5-15H12m0 18h-1.5m3.75-18h-1.5m-3.75 18h1.5m-1.5-18h1.5m-1.5 18h1.5" />
+                              </svg>                              
+                        </div>
                         <h3>PDN SPR Visualizer</h3>
-                        <p>Interactive shortest path resistance analysis for power delivery networks with collision-free pathfinding and real-time visualization</p>
-                        <ul class="tool-features">
-                            <li>Collision-free element placement</li>
-                            <li>Smart pathfinding avoiding obstacles</li>
-                            <li>Multi-domain support with virtual nodes</li>
-                            <li>Real-time resistance calculations</li>
-                            <li>Animated path tracing with particles</li>
-                            <li>Multiple alternative path analysis</li>
-                        </ul>
+                        <p>Analyze shortest path resistance in a power grid. Place ports and sinks, and watch in real-time as the tool calculates and visualizes the most efficient current paths, avoiding obstacles and highlighting potential high-resistance areas.</p>
                         <a href="tools/pdn-spr-visualizer/" class="tool-link">
                             Launch Tool
                             <span>→</span>
                         </a>
                     </div>
+                    <!-- Future tools will be added here -->
                 </div>
-                <!-- More tools can be added here in the future -->
             </div>
-        </div>
-    </section>
+        </section>
+
+        <section id="how-it-works" class="content-section">
+            <div class="container">
+                <h2 class="section-title">How It Works</h2>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h4>Select a Tool</h4>
+                        <p>Choose from the available visualization tools to start your analysis.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h4>Interact & Configure</h4>
+                        <p>Place components, define parameters, and configure the simulation scenario directly in your browser.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h4>Visualize & Analyze</h4>
+                        <p>Observe real-time visualizations of current paths, resistance, and other key PDN metrics.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="about-author" class="content-section author-section">
+            <div class="container">
+                <h2 class="section-title">About the Author</h2>
+                <div class="author-content">
+                    <div class="author-text">
+                        <p>These tools were developed by <strong>Akarshan Arora</strong>, a VLSI engineer with a passion for creating intuitive educational resources. The goal of this project is to demystify complex PDN concepts and provide a hands-on learning platform for students and professionals alike.</p>
+                        <div class="author-links">
+                            <a href="https://github.com/aroraakarshan" target="_blank">GitHub</a>
+                            <a href="https://www.linkedin.com/in/aroraakarshan" target="_blank">LinkedIn</a>
+                            <a href="https://topmate.io/akarshanarora" target="_blank">Topmate</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <footer class="footer">
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-left">
-                    <div class="logo">
-                        <span class="logo-icon">⚡</span>
-                        <span class="logo-text">PDN Toy Tools</span>
-                    </div>
-                    <p>Making power delivery network education interactive and accessible.</p>
-                </div>
-                <div class="footer-right">
-                    <a href="https://github.com/aroraakarshan/pdn-toy-tools" target="_blank" class="footer-link">
-                        View on GitHub
-                    </a>
-                </div>
+            <p>Made with ❤️ by Akarshan Arora | VLSI · PDN · EMIR · Python</p>
+            <div class="footer-links">
+                <a href="https://github.com/aroraakarshan/pdn-toy-tools" target="_blank">GitHub</a>
             </div>
         </div>
     </footer>

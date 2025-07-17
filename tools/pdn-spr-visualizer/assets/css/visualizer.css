@@ -2,24 +2,24 @@
 
 /* CSS Variables */
 :root {
-    --primary-color: #4f46e5;
-    --secondary-color: #06b6d4;
-    --accent-color: #10b981;
-    --warning-color: #f59e0b;
-    --error-color: #ef4444;
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
+    --primary-color: #38bdf8; /* Light Blue */
+    --secondary-color: #67e8f9; /* Cyan */
+    --accent-color: #22d3ee;
+    --warning-color: #facc15; /* Yellow */
+    --error-color: #f472b6; /* Pink */
+    --text-primary: #e0e5f0;
+    --text-secondary: #94a3b8;
     --text-light: #9ca3af;
-    --bg-primary: #ffffff;
-    --bg-secondary: #f9fafb;
-    --bg-tertiary: #f3f4f6;
-    --border-color: #e5e7eb;
+    --bg-primary: #0a0f1f;
+    --bg-secondary: #10162b;
+    --bg-tertiary: #1a2138;
+    --border-color: #2a3352;
     --border-light: #f3f4f6;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    --domain-colors: #4f46e5, #06b6d4, #10b981, #f59e0b, #ef4444, #8b5cf6;
+    --shadow-color: rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 4px var(--shadow-color);
+    --shadow-md: 0 4px 8px var(--shadow-color);
+    --shadow-lg: 0 10px 20px var(--shadow-color);
+    --domain-colors: #38bdf8, #67e8f9, #a78bfa, #f472b6, #facc15, #4ade80;
 }
 
 /* Reset and Base */
@@ -31,9 +31,9 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    line-height: 1.6;
+    background-color: var(--bg-primary);
     color: var(--text-primary);
-    background: var(--bg-secondary);
+    line-height: 1.6;
     overflow-x: hidden;
 }
 
@@ -46,9 +46,9 @@ body {
 
 /* Header */
 .app-header {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -84,7 +84,7 @@ body {
 
 .back-link:hover {
     background: var(--primary-color);
-    color: white;
+    color: var(--bg-primary);
     transform: translateX(-2px);
 }
 
@@ -113,38 +113,37 @@ body {
 .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 0.5rem;
-    font-weight: 500;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
     text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    color: white;
-    box-shadow: var(--shadow-md);
+    background-color: var(--primary-color);
+    color: var(--bg-primary);
+    border-color: var(--primary-color);
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
 }
 
 .btn-secondary {
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
 }
 
 .btn-secondary:hover {
-    color: var(--primary-color);
-    border-color: var(--primary-color);
-    transform: translateY(-1px);
+    background-color: var(--border-color);
 }
 
 .btn-accent {
@@ -166,13 +165,13 @@ body {
 
 /* Main Content */
 .main-content {
-    flex: 1;
-    display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
-    width: 100%;
+    display: grid;
+    grid-template-columns: 350px 1fr;
     gap: 2rem;
     padding: 2rem;
+    max-width: 1800px;
+    margin: 0 auto;
+    flex-grow: 1;
 }
 
 /* Control Panel */
@@ -184,6 +183,15 @@ body {
     height: fit-content;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border-color);
+}
+
+.controls-sidebar {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px); /* Adjust based on header height */
 }
 
 .panel-section {
@@ -199,10 +207,14 @@ body {
 }
 
 .panel-section h3 {
+    font-family: 'Roboto Mono', monospace;
     font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 1rem;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .control-group {
@@ -215,10 +227,10 @@ body {
 
 .control-group label {
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     font-weight: 500;
-    color: var(--text-secondary);
     margin-bottom: 0.5rem;
+    color: var(--text-secondary);
 }
 
 .control-group input[type="range"] {
@@ -258,18 +270,19 @@ body {
 
 .control-group select {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    background: var(--bg-primary);
-    font-size: 0.875rem;
+    border-radius: 8px;
     color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .control-group select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
 }
 
 .control-group input[type="checkbox"] {
@@ -327,7 +340,6 @@ body {
 
 /* Visualization Area */
 .visualization-area {
-    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -335,18 +347,18 @@ body {
 
 .canvas-container {
     position: relative;
-    background: var(--bg-primary);
-    border-radius: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
     overflow: hidden;
+    flex-grow: 1;
+    min-height: 500px;
 }
 
-#pdnCanvas {
-    display: block;
-    width: 100%;
-    height: auto;
-    cursor: crosshair;
+.js-plotly-plot .plotly,
+.js-plotly-plot .plotly-graph-div {
+    background-color: transparent !important;
 }
 
 /* Tooltip */
@@ -513,6 +525,21 @@ body {
 }
 
 /* Responsive Design */
+@media (max-width: 1200px) {
+    .main-content {
+        grid-template-columns: 300px 1fr;
+    }
+}
+
+@media (max-width: 992px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+    .controls-sidebar {
+        max-height: none;
+    }
+}
+
 @media (max-width: 1024px) {
     .main-content {
         flex-direction: column;
