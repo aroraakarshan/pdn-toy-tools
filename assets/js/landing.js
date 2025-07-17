@@ -1,6 +1,82 @@
 // Landing page JavaScript for enhanced interactivity
 
 document.addEventListener('DOMContentLoaded', function() {
+    // tsParticles configuration for VLSI theme
+    tsParticles.load("tsparticles", {
+        fpsLimit: 60,
+        particles: {
+            number: {
+                value: 80,
+                density: {
+                    enable: true,
+                    value_area: 800
+                }
+            },
+            color: {
+                value: "#2a3352"
+            },
+            shape: {
+                type: "square",
+            },
+            opacity: {
+                value: 0.5,
+                random: true,
+            },
+            size: {
+                value: 3,
+                random: true,
+            },
+            links: {
+                enable: true,
+                distance: 150,
+                color: "#38bdf8",
+                opacity: 0.2,
+                width: 1
+            },
+            move: {
+                enable: true,
+                speed: 1,
+                direction: "none",
+                out_mode: "out",
+                bounce: false,
+                attract: {
+                    enable: false,
+                    rotateX: 600,
+                    rotateY: 1200
+                }
+            }
+        },
+        interactivity: {
+            detect_on: "canvas",
+            events: {
+                onhover: {
+                    enable: true,
+                    mode: "grab"
+                },
+                onclick: {
+                    enable: true,
+                    mode: "push"
+                },
+                resize: true
+            },
+            modes: {
+                grab: {
+                    distance: 140,
+                    line_linked: {
+                        opacity: 0.5
+                    }
+                },
+                push: {
+                    particles_nb: 4
+                },
+            }
+        },
+        retina_detect: true,
+        background: {
+            color: "transparent"
+        }
+    });
+
     // Smooth scrolling for navigation links
     const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
     navLinks.forEach(link => {
