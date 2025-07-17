@@ -112,6 +112,20 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(el);
     });
 
+    // GSAP Scroll-triggered animation for the circuit
+    gsap.registerPlugin(ScrollTrigger);
+
+    gsap.to(".animated-circuit-path", {
+        strokeDashoffset: 0,
+        scrollTrigger: {
+            trigger: ".tool-card",
+            start: "top 80%", // When the top of the card is 80% from the top of the viewport
+            end: "bottom 60%", // When the bottom of the card is 60% from the top of the viewport
+            scrub: true, // Smoothly scrubs the animation as you scroll
+            markers: false // Set to true for debugging
+        }
+    });
+
     // Enhanced circuit animation
     const animatedPath = document.querySelector('.animated-path');
     const bumps = document.querySelectorAll('.bump');

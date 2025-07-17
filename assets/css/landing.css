@@ -274,6 +274,18 @@ main {
     color: var(--primary-color);
 }
 
+.tool-icon svg {
+    width: 48px;
+    height: 48px;
+    color: var(--cyan);
+    transition: all 0.3s ease;
+}
+
+.animated-circuit-path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+}
+
 .tool-card h3 {
     font-size: 1.5rem;
     font-weight: 600;
