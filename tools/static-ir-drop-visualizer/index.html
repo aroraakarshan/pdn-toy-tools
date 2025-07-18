@@ -44,17 +44,105 @@
 
                 <div class="panel-section">
                     <h3>IR Drop Analysis</h3>
+                    
+                    <!-- Multi-Source Selection Interface -->
                     <div class="control-group">
-                        <label for="currentSource">Current Source:</label>
-                        <select id="currentSource">
-                            <option value="">Select current source...</option>
-                        </select>
+                        <label>Current Sources:</label>
+                        <div id="multiSourceContainer" class="multi-source-container">
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-0">
+                                        Instance 1
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-0">Current (mA):</label>
+                                    <input type="range" id="current-instance-0" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-0">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-1">
+                                        Instance 2
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-1">Current (mA):</label>
+                                    <input type="range" id="current-instance-1" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-1">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-2">
+                                        Instance 3
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-2">Current (mA):</label>
+                                    <input type="range" id="current-instance-2" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-2">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-3">
+                                        Instance 4
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-3">Current (mA):</label>
+                                    <input type="range" id="current-instance-3" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-3">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-4">
+                                        Instance 5
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-4">Current (mA):</label>
+                                    <input type="range" id="current-instance-4" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-4">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-5">
+                                        Instance 6
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-5">Current (mA):</label>
+                                    <input type="range" id="current-instance-5" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-5">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                            <div class="source-item">
+                                <div class="source-header">
+                                    <label>
+                                        <input type="checkbox" class="source-checkbox" data-instance-id="instance-6">
+                                        Instance 7
+                                    </label>
+                                </div>
+                                <div class="source-controls" style="display: none;">
+                                    <label for="current-instance-6">Current (mA):</label>
+                                    <input type="range" id="current-instance-6" class="current-slider" min="10" max="1000" step="10" value="100" data-instance-id="instance-6">
+                                    <span class="current-display">100mA</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="control-group">
-                        <label for="currentValue">Current (mA):</label>
-                        <input type="range" id="currentValue" min="10" max="1000" step="10" value="100">
-                        <span id="currentDisplay">100mA</span>
-                    </div>
+                    
                     <button id="simulateIR" class="btn btn-accent">Simulate IR Drop</button>
                     <button id="clearSimulation" class="btn btn-secondary">Clear Simulation</button>
                     <button id="animateFlow" class="btn btn-secondary">Animate Current Flow</button>
@@ -165,5 +253,44 @@
     <script src="assets/js/animation.js"></script>
     <script src="assets/js/plotly-grid.js"></script>
     <script src="assets/js/visualizer.js"></script>
+    <script>
+        // Basic functionality for multi-source selection (UI only)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle checkbox changes to show/hide controls
+            document.querySelectorAll('.source-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    console.log('Checkbox changed:', this.getAttribute('data-instance-id'), this.checked);
+                    const sourceItem = this.closest('.source-item');
+                    const controls = sourceItem.querySelector('.source-controls');
+                    controls.style.display = this.checked ? 'block' : 'none';
+                    
+                    // Update the visualization when sources are selected/deselected
+                    if (window.irDropVisualizer) {
+                        window.irDropVisualizer.updateSelectedSources();
+                        if (window.plotlyGrid) {
+                            window.plotlyGrid.updatePlot();
+                        }
+                    }
+                });
+            });
+            
+            // Handle slider changes to update display
+            document.querySelectorAll('.current-slider').forEach(slider => {
+                slider.addEventListener('input', function() {
+                    const sourceItem = this.closest('.source-item');
+                    const display = sourceItem.querySelector('.current-display');
+                    display.textContent = this.value + 'mA';
+                    
+                    // Update the visualization when current values change
+                    if (window.irDropVisualizer) {
+                        window.irDropVisualizer.updateSelectedSources();
+                        if (window.plotlyGrid) {
+                            window.plotlyGrid.updatePlot();
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

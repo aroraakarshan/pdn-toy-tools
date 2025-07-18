@@ -150,7 +150,6 @@ class PlotlyGridVisualizer {
         }
         
         this.updatePlot();
-        this.updateSelectionDropdowns();
     }
     
     getAvailablePosition(occupiedPositions) {
@@ -277,8 +276,44 @@ class PlotlyGridVisualizer {
             customdata: this.instances.map(inst => ({ type: 'instance', data: inst }))
         });
         
-        // Add current source marker if selected
-        if (this.currentSource) {
+        // Add current source markers for selected instances
+        const selectedSources = window.irDropVisualizer ? window.irDropVisualizer.getSelectedSources() : new Map();
+        
+        if (selectedSources.size > 0) {
+            const sourceX = [];
+            const sourceY = [];
+            const sourceTexts = [];
+            
+            selectedSources.forEach((currentValue, instanceId) => {
+                const source = this.instances.find(i => i.id == instanceId);
+                if (source) {
+                    sourceX.push(source.col);
+                    sourceY.push(source.row);
+                    sourceTexts.push(`Current Source<br>Instance ${instanceId}<br>${currentValue}mA`);
+                }
+            });
+            
+            if (sourceX.length > 0) {
+                traces.push({
+                    x: sourceX,
+                    y: sourceY,
+                    mode: 'markers',
+                    marker: {
+                        color: 'green',
+                        size: 16,
+                        symbol: 'star',
+                        line: { color: 'darkgreen', width: 2 }
+                    },
+                    name: 'Current Sources',
+                    showlegend: true,
+                    hovertext: sourceTexts,
+                    hoverinfo: 'text'
+                });
+            }
+        }
+        
+        // Fallback for old single source method (if still used)
+        if (this.currentSource && selectedSources.size === 0) {
             const source = this.instances.find(i => i.id === this.currentSource);
             if (source) {
                 traces.push({
@@ -641,6 +676,143 @@ class PlotlyGridVisualizer {
     
     resize() {
         Plotly.Plots.resize(this.containerId);
+    }
+    
+    simulateMultiSourceIRDrop(selectedSources) {
+        if (!selectedSources || selectedSources.size === 0) {
+            alert('Please select at least one current source');
+            return;
+        }
+        
+        console.log('Simulating multi-source IR drop with sources:', Array.from(selectedSources.entries()));
+        
+        // Calculate voltage distribution with multiple sources
+        this.voltageMap = this.calculateMultiSourceVoltageDistribution(selectedSources);
+        
+        // Update visualization
+        this.updatePlot();
+        
+        // Update results
+        this.updateMultiSourceAnalysisResults(selectedSources);
+        
+        // Mark simulation as active
+        window.irDropVisualizer.setSimulationActive(true);
+    }
+    
+    calculateMultiSourceVoltageDistribution(selectedSources) {
+        const voltages = [];
+        const sourceVoltage = 1.0;
+        
+        // Initialize voltage map
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            voltages[row] = [];
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                voltages[row][col] = sourceVoltage; // Start with supply voltage
+            }
+        }
+        
+        // Apply voltage drops from all current sources using superposition
+        selectedSources.forEach((currentMa, instanceId) => {
+            const source = this.instances.find(i => i.id == instanceId);
+            if (!source) {
+                console.warn(`Instance ${instanceId} not found`);
+                return;
+            }
+            
+            const currentA = currentMa / 1000; // Convert to Amperes
+            const resistance = 0.1; // Average resistance between nodes
+            
+            // Calculate voltage drop contribution from this source
+            for (let row = 0; row < this.gridSize.rows; row++) {
+                for (let col = 0; col < this.gridSize.cols; col++) {
+                    if (row === source.row && col === source.col) continue;
+                    
+                    // Calculate Manhattan distance from source
+                    const distance = Math.abs(row - source.row) + Math.abs(col - source.col);
+                    
+                    // Calculate voltage drop based on distance and current
+                    const voltageDrop = currentA * resistance * distance * 0.5; // Reduced for multiple sources
+                    voltages[row][col] = Math.max(0, voltages[row][col] - voltageDrop);
+                }
+            }
+        });
+        
+        return voltages;
+    }
+    
+    updateMultiSourceAnalysisResults(selectedSources) {
+        if (!this.voltageMap) return;
+        
+        let maxIRDrop = 0;
+        let minVoltage = 1.0;
+        let totalCurrent = 0;
+        
+        // Calculate total current from all sources
+        selectedSources.forEach((currentMa) => {
+            totalCurrent += currentMa;
+        });
+        
+        // Find max IR drop and min voltage
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                const voltage = this.voltageMap[row][col];
+                const irDrop = 1.0 - voltage;
+                
+                if (irDrop > maxIRDrop) maxIRDrop = irDrop;
+                if (voltage < minVoltage) minVoltage = voltage;
+            }
+        }
+        
+        // Calculate approximate total power loss
+        const totalPowerLoss = (totalCurrent / 1000) * maxIRDrop * 1000; // mW
+        
+        // Create results object
+        const results = {
+            type: 'multi-source',
+            activeSources: selectedSources.size,
+            totalCurrent: totalCurrent,
+            maxIRDrop: (maxIRDrop * 1000).toFixed(1), // Convert to mV
+            minVoltage: minVoltage.toFixed(3),
+            totalPowerLoss: totalPowerLoss.toFixed(2),
+            sources: Array.from(selectedSources.entries()).map(([id, current]) => ({
+                id: id,
+                current: current
+            }))
+        };
+        
+        // Update the results display
+        this.displayMultiSourceResults(results);
+    }
+    
+    displayMultiSourceResults(results) {
+        const resultsDiv = document.getElementById('analysisResults');
+        if (!resultsDiv) return;
+        
+        let html = '<div class="multi-source-results">';
+        
+        // Summary section
+        html += '<div class="results-summary">';
+        html += '<h4>Multi-Source Analysis Summary</h4>';
+        html += `<p><strong>Active Sources:</strong> ${results.activeSources}</p>`;
+        html += `<p><strong>Total Current:</strong> ${results.totalCurrent}mA</p>`;
+        html += `<p><strong>Max IR Drop:</strong> ${results.maxIRDrop}mV</p>`;
+        html += `<p><strong>Min Voltage:</strong> ${results.minVoltage}V</p>`;
+        html += `<p><strong>Total Power Loss:</strong> ${results.totalPowerLoss}mW</p>`;
+        html += '</div>';
+        
+        // Individual sources section
+        if (results.sources.length > 0) {
+            html += '<div class="individual-sources">';
+            html += '<h4>Individual Source Currents</h4>';
+            results.sources.forEach(source => {
+                html += `<p><strong>Instance ${source.id}:</strong> ${source.current}mA</p>`;
+            });
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        
+        resultsDiv.innerHTML = html;
     }
 }
 

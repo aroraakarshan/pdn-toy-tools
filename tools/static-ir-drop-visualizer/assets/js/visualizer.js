@@ -7,6 +7,7 @@ class IRDropVisualizer {
         this.animationEngine = null;
         this.currentSource = null;
         this.currentValue = 100; // mA
+        this.selectedSources = new Map(); // Map of instance ID to current value
         this.showVoltages = true;
         this.showCurrentFlow = true;
         this.tooltip = null;
@@ -38,23 +39,19 @@ class IRDropVisualizer {
             }
         });
         
-        // Current value control
-        document.getElementById('currentValue').addEventListener('input', (e) => {
-            this.currentValue = parseInt(e.target.value);
-            document.getElementById('currentDisplay').textContent = this.currentValue + 'mA';
-        });
-        
         // Button events
         document.getElementById('generateNetwork').addEventListener('click', () => {
             if (window.plotlyGrid) {
                 window.plotlyGrid.generateFixedGrid();
-                this.updateCurrentSourceDropdown();
             }
         });
         
         document.getElementById('simulateIR').addEventListener('click', () => {
+            // Get selected sources from the multi-source interface
+            this.updateSelectedSources();
+            
             if (window.plotlyGrid) {
-                window.plotlyGrid.simulateIRDrop();
+                window.plotlyGrid.simulateMultiSourceIRDrop(this.selectedSources);
             }
         });
         
@@ -93,14 +90,6 @@ class IRDropVisualizer {
             }
         });
         
-        // Current source selection
-        document.getElementById('currentSource').addEventListener('change', (e) => {
-            this.currentSource = e.target.value;
-            if (window.plotlyGrid) {
-                window.plotlyGrid.selectCurrentSource(this.currentSource);
-            }
-        });
-        
         // Modal events
         this.setupModalEvents();
         
@@ -132,31 +121,38 @@ class IRDropVisualizer {
     
     generateInitialGrid() {
         // Initial grid generation happens in the constructor
-        setTimeout(() => {
-            this.updateCurrentSourceDropdown();
-        }, 100);
+        // Multi-source interface doesn't need dropdown updates
     }
     
-    updateCurrentSourceDropdown() {
-        const select = document.getElementById('currentSource');
-        select.innerHTML = '<option value="">Select current source...</option>';
+    updateSelectedSources() {
+        this.selectedSources.clear();
         
-        if (window.plotlyGrid && window.plotlyGrid.instances) {
-            window.plotlyGrid.instances.forEach((instance) => {
-                const option = document.createElement('option');
-                option.value = instance.id;
-                option.textContent = `Instance ${instance.id}`;
-                select.appendChild(option);
-            });
-        }
+        // Get all checked source checkboxes
+        const checkedSources = document.querySelectorAll('.source-checkbox:checked');
+        
+        checkedSources.forEach(checkbox => {
+            const instanceId = checkbox.getAttribute('data-instance-id');
+            const slider = document.getElementById(`current-${instanceId}`);
+            const currentValue = parseInt(slider.value);
+            
+            this.selectedSources.set(instanceId, currentValue);
+        });
+        
+        console.log('Selected sources:', Array.from(this.selectedSources.entries()));
+        console.log('Available instances:', window.plotlyGrid ? window.plotlyGrid.instances.map(i => i.id) : 'no instances');
     }
     
     resetVisualization() {
         this.currentSource = null;
         this.simulationActive = false;
-        document.getElementById('currentSource').value = '';
-        document.getElementById('currentValue').value = 100;
-        document.getElementById('currentDisplay').textContent = '100mA';
+        this.selectedSources.clear();
+        
+        // Uncheck all source checkboxes and hide controls
+        document.querySelectorAll('.source-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+            const controls = checkbox.closest('.source-item').querySelector('.source-controls');
+            controls.style.display = 'none';
+        });
         
         if (window.plotlyGrid) {
             window.plotlyGrid.clearSimulation();
@@ -218,6 +214,10 @@ class IRDropVisualizer {
     
     getCurrentValue() {
         return this.currentValue;
+    }
+    
+    getSelectedSources() {
+        return this.selectedSources;
     }
     
     getShowVoltages() {
