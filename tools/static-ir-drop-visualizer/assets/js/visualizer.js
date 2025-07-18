@@ -165,11 +165,23 @@ class IRDropVisualizer {
         const resultsDiv = document.getElementById('analysisResults');
         
         if (!results) {
-            resultsDiv.innerHTML = '<p>Select a current source to see IR drop analysis</p>';
+            resultsDiv.innerHTML = `
+                <div class="result-item">
+                    <span class="result-label">Supply Voltage:</span>
+                    <span class="result-value">1.0V</span>
+                </div>
+                <p style="margin-top: 0.75rem; color: var(--text-secondary);">
+                    Select current sources and click "Simulate IR Drop" to see detailed analysis
+                </p>
+            `;
             return;
         }
         
         resultsDiv.innerHTML = `
+            <div class="result-item">
+                <span class="result-label">Supply Voltage:</span>
+                <span class="result-value">1.0V</span>
+            </div>
             <div class="result-item">
                 <span class="result-label">Current Source:</span>
                 <span class="result-value">${results.source}</span>
