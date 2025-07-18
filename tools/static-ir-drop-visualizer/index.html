@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Static IR Drop Visualizer - Interactive Power Delivery Network Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/visualizer.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo">
+                    <a href="../../index.html" class="back-link">
+                        <span class="back-icon">←</span>
+                    </a>
+                    <span class="logo-icon">⚡</span>
+                    <h1>Static IR Drop Visualizer</h1>
+                </div>
+                <div class="header-controls">
+                    <button id="helpBtn" class="btn btn-secondary">
+                        <span>?</span>
+                        Help
+                    </button>
+                    <button id="resetBtn" class="btn btn-secondary">
+                        <span>↻</span>
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Panel -->
+            <aside class="control-panel">
+                <div class="panel-section">
+                    <h3>Network Generation</h3>
+                    <button id="generateNetwork" class="btn btn-primary">Generate New Network</button>
+                </div>
+
+                <div class="panel-section">
+                    <h3>IR Drop Analysis</h3>
+                    <div class="control-group">
+                        <label for="currentSource">Current Source:</label>
+                        <select id="currentSource">
+                            <option value="">Select current source...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="currentValue">Current (mA):</label>
+                        <input type="range" id="currentValue" min="10" max="1000" step="10" value="100">
+                        <span id="currentDisplay">100mA</span>
+                    </div>
+                    <button id="simulateIR" class="btn btn-accent">Simulate IR Drop</button>
+                    <button id="clearSimulation" class="btn btn-secondary">Clear Simulation</button>
+                    <button id="animateFlow" class="btn btn-secondary">Animate Current Flow</button>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Animation Controls</h3>
+                    <div class="control-group">
+                        <label for="animationSpeed">Speed:</label>
+                        <input type="range" id="animationSpeed" min="0.5" max="3" step="0.1" value="1">
+                        <span id="speedValue">1x</span>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="showVoltages" checked>
+                            Show Voltage Values
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="showCurrentFlow" checked>
+                            Show Current Flow
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Color Scale</h3>
+                    <div class="color-scale">
+                        <div class="scale-bar">
+                            <div class="scale-gradient"></div>
+                        </div>
+                        <div class="scale-labels">
+                            <span>Low IR Drop</span>
+                            <span>High IR Drop</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Results</h3>
+                    <div id="analysisResults" class="results-display">
+                        <p>Select a current source to see IR drop analysis</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Visualization Area -->
+            <section class="visualization-area">
+                <div class="canvas-container">
+                    <div id="irDropPlot" style="width:800px;height:600px;"></div>
+                    <div id="tooltipDisplay" class="tooltip"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal" onclick="if(event.target === this) this.classList.remove('active')">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Static IR Drop Visualizer Help</h2>
+                    <button class="modal-close" onclick="document.getElementById('helpModal').classList.remove('active')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h3>What is Static IR Drop Analysis?</h3>
+                    <p>Static IR Drop analysis examines the voltage drop across a Power Delivery Network (PDN) when a steady current is applied. This helps identify areas of high resistance and potential power delivery issues in circuit design.</p>
+                    
+                    <h3>How to Use This Tool:</h3>
+                    <ol>
+                        <li><strong>Auto-Generated Network:</strong> The tool automatically generates a 10x10 grid with 1 domain and 7 instances</li>
+                        <li><strong>Generate New Network:</strong> Click "Generate New Network" to create a fresh random layout</li>
+                        <li><strong>Select Current Source:</strong> Choose an instance to act as the current source</li>
+                        <li><strong>Set Current:</strong> Adjust the current value using the slider (10-1000mA)</li>
+                        <li><strong>Simulate IR Drop:</strong> Click "Simulate IR Drop" to calculate and visualize voltage distribution</li>
+                        <li><strong>Animate Current Flow:</strong> Visualize how current flows through the network with animated particles</li>
+                    </ol>
+                    
+                    <h3>Current Features:</h3>
+                    <ul>
+                        <li><strong>Interactive Grid:</strong> 10x10 power delivery network with realistic resistance values</li>
+                        <li><strong>Domain System:</strong> 1 domain with 4 connection points (bumps)</li>
+                        <li><strong>Instance Sources:</strong> 7 scattered instances that can act as current sources</li>
+                        <li><strong>Color-coded Visualization:</strong> Heat map showing voltage levels across the grid</li>
+                        <li><strong>Real-time Analysis:</strong> Live voltage calculations and IR drop measurements</li>
+                        <li><strong>Current Flow Animation:</strong> Animated particles showing current distribution</li>
+                        <li><strong>Interactive Controls:</strong> Adjustable current levels and animation speed</li>
+                        <li><strong>Numerical Analysis:</strong> Detailed voltage and current measurements</li>
+                    </ul>
+                    
+                    <h3>Understanding the Visualization:</h3>
+                    <ul>
+                        <li><strong>Grid Network:</strong> Gray lines represent resistive connections between nodes</li>
+                        <li><strong>Domain Bumps:</strong> Red squares showing low-resistance connection points</li>
+                        <li><strong>Instance Sources:</strong> Purple circles representing potential current sources</li>
+                        <li><strong>Color Gradient:</strong> Blue (low IR drop) to red (high IR drop) heat map</li>
+                        <li><strong>Current Flow:</strong> Animated particles showing current distribution paths</li>
+                        <li><strong>Voltage Labels:</strong> Numerical values showing voltage at each node</li>
+                    </ul>
+                    
+                    <h3>Educational Value:</h3>
+                    <p>This tool helps understand how current flows through a PDN, where voltage drops occur, and how different network topologies affect power delivery efficiency. Perfect for learning about power integrity in electronic design.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/ir-drop-engine.js"></script>
+    <script src="assets/js/animation.js"></script>
+    <script src="assets/js/plotly-grid.js"></script>
+    <script src="assets/js/visualizer.js"></script>
+</body>
+</html>

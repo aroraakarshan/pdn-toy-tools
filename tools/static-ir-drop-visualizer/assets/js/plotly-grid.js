@@ -1,0 +1,650 @@
+// Plotly-based Grid Visualization for Static IR Drop Analysis
+
+class PlotlyGridVisualizer {
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.grid = null;
+        this.gridSize = { rows: 10, cols: 10 };
+        this.domains = [];
+        this.instances = [];
+        this.currentSource = null;
+        this.voltageMap = null;
+        this.currentFlowMap = null;
+        this.showVoltages = true;
+        this.showCurrentFlow = true;
+        
+        // Animation tracking
+        this.animationTimeouts = [];
+        this.animationIntervals = [];
+        
+        this.initializePlot();
+        this.generateFixedGrid(); // Auto-generate circuit on page load
+    }
+    
+    initializePlot() {
+        // Create empty plot
+        const layout = {
+            title: {
+                text: 'PDN Grid Network',
+                font: { size: 16 }
+            },
+            xaxis: {
+                title: 'Column',
+                dtick: 1,
+                range: [-0.5, this.gridSize.cols - 0.5],
+                showgrid: true,
+                gridwidth: 1,
+                gridcolor: '#e0e0e0'
+            },
+            yaxis: {
+                title: 'Row',
+                dtick: 1,
+                range: [-0.5, this.gridSize.rows - 0.5],
+                showgrid: true,
+                gridwidth: 1,
+                gridcolor: '#e0e0e0',
+                scaleanchor: 'x',
+                scaleratio: 1
+            },
+            showlegend: true,
+            plot_bgcolor: '#f8f9fa',
+            paper_bgcolor: 'white',
+            margin: { l: 60, r: 40, t: 60, b: 60 },
+            hovermode: 'closest',
+            hoverdistance: 20
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+            displaylogo: false
+        };
+        
+        Plotly.newPlot(this.containerId, [], layout, config);
+        
+        // Add click event listener
+        document.getElementById(this.containerId).on('plotly_click', (data) => {
+            this.handlePlotClick(data);
+        });
+    }
+    
+    generateFixedGrid() {
+        // Clear existing data
+        this.domains = [];
+        this.instances = [];
+        this.currentSource = null;
+        this.voltageMap = null;
+        this.currentFlowMap = null;
+        
+        // Create grid with non-uniform segment resistances
+        this.gridResistances = [];
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            this.gridResistances[row] = [];
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                this.gridResistances[row][col] = {
+                    right: col < this.gridSize.cols - 1 ? 0.05 + Math.random() * 0.15 : null, // 0.05-0.2Ω
+                    down: row < this.gridSize.rows - 1 ? 0.05 + Math.random() * 0.15 : null   // 0.05-0.2Ω
+                };
+            }
+        }
+        
+        // Generate 1 domain with 4 randomly placed bumps
+        const colors = ['#FF6B6B'];
+        const domainNames = ['Domain A'];
+        
+        // Track occupied grid positions to prevent overlapping
+        const occupiedPositions = new Set();
+        
+        const domain = {
+            id: 0,
+            name: domainNames[0],
+            color: colors[0],
+            bumps: []
+        };
+        
+        // Generate exactly 4 bumps for this domain
+        const numBumps = 4;
+        for (let b = 0; b < numBumps; b++) {
+            const position = this.getAvailablePosition(occupiedPositions);
+            if (position) {
+                const bump = {
+                    id: `bump-0-${b}`,
+                    domainId: 0,
+                    row: position.row,
+                    col: position.col,
+                    resistance: 0.01 + Math.random() * 0.04, // 0.01 - 0.05 ohms (very low for bumps)
+                    type: 'bump'
+                };
+                domain.bumps.push(bump);
+                occupiedPositions.add(`${position.row},${position.col}`);
+            }
+        }
+        
+        // Add virtual node for domain (represents the low-resistance domain connection)
+        domain.virtualNode = {
+            id: `virtual-0`,
+            domainId: 0,
+            row: -1, // Virtual position
+            col: -1,
+            resistance: 0.001, // Very low resistance (1mΩ)
+            type: 'virtual'
+        };
+        
+        this.domains.push(domain);
+        
+        // Generate 7 independent instances scattered across grid
+        for (let i = 0; i < 7; i++) {
+            const position = this.getAvailablePosition(occupiedPositions);
+            if (position) {
+                const instance = {
+                    id: `instance-${i}`,
+                    row: position.row,
+                    col: position.col,
+                    resistance: 0.3 + Math.random() * 1.7, // 0.3 - 2.0 ohms
+                    type: 'instance'
+                };
+                this.instances.push(instance);
+                occupiedPositions.add(`${position.row},${position.col}`);
+            }
+        }
+        
+        this.updatePlot();
+        this.updateSelectionDropdowns();
+    }
+    
+    getAvailablePosition(occupiedPositions) {
+        // Try to find an available position on the grid
+        const maxAttempts = 50;
+        
+        // Try random positions first
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const row = Math.floor(Math.random() * this.gridSize.rows);
+            const col = Math.floor(Math.random() * this.gridSize.cols);
+            const positionKey = `${row},${col}`;
+            
+            if (!occupiedPositions.has(positionKey)) {
+                return { row, col };
+            }
+        }
+        
+        // If random attempts failed, do systematic search
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                const positionKey = `${row},${col}`;
+                if (!occupiedPositions.has(positionKey)) {
+                    return { row, col };
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    updatePlot() {
+        const traces = [];
+        
+        // Add grid network connections
+        const gridX = [];
+        const gridY = [];
+        
+        // Horizontal lines
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols - 1; col++) {
+                gridX.push(col, col + 1, null);
+                gridY.push(row, row, null);
+            }
+        }
+        
+        // Vertical lines
+        for (let col = 0; col < this.gridSize.cols; col++) {
+            for (let row = 0; row < this.gridSize.rows - 1; row++) {
+                gridX.push(col, col, null);
+                gridY.push(row, row + 1, null);
+            }
+        }
+        
+        // Grid lines trace
+        traces.push({
+            x: gridX,
+            y: gridY,
+            mode: 'lines',
+            line: { color: '#ddd', width: 1 },
+            name: 'Grid Network',
+            showlegend: true,
+            hoverinfo: 'skip'
+        });
+        
+        // Add voltage heatmap if simulation is active
+        if (this.voltageMap) {
+            const heatmapTrace = this.createHeatmapTrace();
+            traces.push(heatmapTrace);
+        }
+        
+        // Add domain bumps
+        this.domains.forEach((domain, domainIndex) => {
+            const x = domain.bumps.map(bump => bump.col);
+            const y = domain.bumps.map(bump => bump.row);
+            const text = domain.bumps.map(bump => 
+                `Bump ${bump.id}<br>Domain: ${domain.name}<br>Resistance: ${bump.resistance.toFixed(3)}Ω`
+            );
+            
+            traces.push({
+                x: x,
+                y: y,
+                mode: 'markers',
+                marker: {
+                    color: domain.color,
+                    size: 14,
+                    symbol: 'circle',
+                    line: { color: '#2c3e50', width: 3 }
+                },
+                name: `${domain.name} Bumps`,
+                text: text,
+                hoverinfo: 'text',
+                customdata: domain.bumps.map(bump => ({ type: 'bump', data: bump }))
+            });
+        });
+        
+        // Add independent instances
+        const instanceX = this.instances.map(inst => inst.col);
+        const instanceY = this.instances.map(inst => inst.row);
+        const instanceText = this.instances.map(inst => 
+            `Instance ${inst.id}<br>Independent Node<br>Resistance: ${inst.resistance.toFixed(3)}Ω`
+        );
+        const instanceNumbers = this.instances.map(inst => inst.id.split('-')[1]);
+        
+        traces.push({
+            x: instanceX,
+            y: instanceY,
+            mode: 'markers+text',
+            marker: {
+                color: '#9B59B6',
+                size: 16,
+                symbol: 'square',
+                line: { color: '#663399', width: 2 }
+            },
+            text: instanceNumbers,
+            textposition: 'middle center',
+            textfont: {
+                color: 'white',
+                size: 10,
+                family: 'Arial Black'
+            },
+            name: 'Instances',
+            hovertext: instanceText,
+            hoverinfo: 'text',
+            customdata: this.instances.map(inst => ({ type: 'instance', data: inst }))
+        });
+        
+        // Add current source marker if selected
+        if (this.currentSource) {
+            const source = this.instances.find(i => i.id === this.currentSource);
+            if (source) {
+                traces.push({
+                    x: [source.col],
+                    y: [source.row],
+                    mode: 'markers',
+                    marker: {
+                        color: 'green',
+                        size: 16,
+                        symbol: 'star',
+                        line: { color: 'darkgreen', width: 2 }
+                    },
+                    name: 'Source',
+                    showlegend: true,
+                    hovertext: [`Current Source<br>${window.irDropVisualizer.getCurrentValue()}mA`],
+                    hoverinfo: 'text'
+                });
+            }
+        }
+        
+        // Add voltage annotations if enabled
+        if (this.showVoltages && this.voltageMap) {
+            this.addVoltageAnnotations();
+        }
+        
+        Plotly.react(this.containerId, traces);
+    }
+    
+    createHeatmapTrace() {
+        const z = [];
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            z[row] = [];
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                z[row][col] = this.voltageMap[row][col] || 0;
+            }
+        }
+        
+        return {
+            z: z,
+            type: 'heatmap',
+            colorscale: [
+                [0, '#0066cc'],      // Low IR drop (blue)
+                [0.5, '#ffcc00'],    // Medium IR drop (yellow)
+                [1, '#ff3300']       // High IR drop (red)
+            ],
+            showscale: true,
+            colorbar: {
+                title: 'Voltage (V)',
+                titlefont: { color: '#e0e5f0' },
+                tickfont: { color: '#e0e5f0' }
+            },
+            hovertemplate: 'Row: %{y}<br>Col: %{x}<br>Voltage: %{z:.3f}V<extra></extra>',
+            name: 'IR Drop Heatmap',
+            showlegend: false
+        };
+    }
+    
+    addVoltageAnnotations() {
+        const annotations = [];
+        
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                if (this.voltageMap[row][col] !== null) {
+                    annotations.push({
+                        x: col,
+                        y: row,
+                        text: `${this.voltageMap[row][col].toFixed(3)}V`,
+                        showarrow: false,
+                        font: { size: 8, color: '#e0e5f0' },
+                        bgcolor: 'rgba(0,0,0,0.5)',
+                        bordercolor: '#2a3352',
+                        borderwidth: 1
+                    });
+                }
+            }
+        }
+        
+        Plotly.relayout(this.containerId, { annotations: annotations });
+    }
+    
+    handlePlotClick(data) {
+        if (data.points && data.points.length > 0) {
+            const point = data.points[0];
+            if (point.customdata) {
+                const element = point.customdata;
+                if (element.type === 'instance') {
+                    this.selectInstance(element.data);
+                } else if (element.type === 'bump') {
+                    this.selectBump(element.data);
+                }
+            }
+        }
+    }
+    
+    selectInstance(instance) {
+        this.selectCurrentSource(instance.id);
+        
+        // Update dropdown
+        document.getElementById('currentSource').value = instance.id;
+    }
+    
+    selectBump(bump) {
+        // For IR drop visualizer, clicking on bumps doesn't do anything special
+        // But we keep the method for consistency with SPR visualizer
+    }
+    
+    selectCurrentSource(sourceId) {
+        this.currentSource = sourceId;
+        this.updatePlot();
+    }
+    
+    updateSelectionDropdowns() {
+        const currentSourceSelect = document.getElementById('currentSource');
+        
+        // Clear existing options
+        currentSourceSelect.innerHTML = '<option value="">Select current source...</option>';
+        
+        // Add only instances to current source dropdown
+        this.instances.forEach(instance => {
+            const option = document.createElement('option');
+            option.value = instance.id;
+            option.textContent = `Instance ${instance.id}`;
+            currentSourceSelect.appendChild(option);
+        });
+        
+        // Add event listener for dropdown change
+        currentSourceSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const selected = this.instances.find(inst => inst.id === e.target.value);
+                if (selected) {
+                    this.selectCurrentSource(selected.id);
+                }
+            }
+        });
+    }
+    
+    simulateIRDrop() {
+        if (!this.currentSource) {
+            alert('Please select a current source first');
+            return;
+        }
+        
+        const currentValue = window.irDropVisualizer.getCurrentValue();
+        const source = this.instances.find(i => i.id === this.currentSource);
+        
+        if (!source) {
+            alert('Invalid current source selected');
+            return;
+        }
+        
+        // Calculate voltage distribution using nodal analysis
+        this.voltageMap = this.calculateVoltageDistribution(source, currentValue);
+        
+        // Update visualization
+        this.updatePlot();
+        
+        // Update results
+        this.updateAnalysisResults(source, currentValue);
+        
+        // Mark simulation as active
+        window.irDropVisualizer.setSimulationActive(true);
+    }
+    
+    calculateVoltageDistribution(source, currentMa) {
+        const voltages = [];
+        const currentA = currentMa / 1000; // Convert to Amperes
+        
+        // Initialize voltage map
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            voltages[row] = [];
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                voltages[row][col] = 0;
+            }
+        }
+        
+        // Set source voltage (assume 1V supply)
+        const sourceVoltage = 1.0;
+        voltages[source.row][source.col] = sourceVoltage;
+        
+        // Simple voltage drop calculation using resistance network
+        // This is a simplified model - in practice, you'd use nodal analysis
+        const resistance = 0.1; // Average resistance between nodes
+        
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                if (row === source.row && col === source.col) continue;
+                
+                // Calculate Manhattan distance from source
+                const distance = Math.abs(row - source.row) + Math.abs(col - source.col);
+                
+                // Calculate voltage drop based on distance and current
+                const voltageDrop = currentA * resistance * distance;
+                voltages[row][col] = Math.max(0, sourceVoltage - voltageDrop);
+            }
+        }
+        
+        return voltages;
+    }
+    
+    updateAnalysisResults(source, currentMa) {
+        if (!this.voltageMap) return;
+        
+        let maxIRDrop = 0;
+        let minVoltage = 1.0;
+        
+        // Find max IR drop and min voltage
+        for (let row = 0; row < this.gridSize.rows; row++) {
+            for (let col = 0; col < this.gridSize.cols; col++) {
+                const voltage = this.voltageMap[row][col];
+                const irDrop = 1.0 - voltage;
+                
+                if (irDrop > maxIRDrop) maxIRDrop = irDrop;
+                if (voltage < minVoltage) minVoltage = voltage;
+            }
+        }
+        
+        // Calculate approximate power loss
+        const powerLoss = (currentMa / 1000) * maxIRDrop * 1000; // mW
+        
+        const results = {
+            source: `Instance ${source.id}`,
+            current: currentMa,
+            maxIRDrop: (maxIRDrop * 1000).toFixed(1), // Convert to mV
+            minVoltage: minVoltage.toFixed(3),
+            powerLoss: powerLoss.toFixed(2)
+        };
+        
+        window.irDropVisualizer.updateAnalysisResults(results);
+    }
+    
+    clearSimulation() {
+        this.voltageMap = null;
+        this.currentFlowMap = null;
+        this.currentSource = null;
+        this.updatePlot();
+        window.irDropVisualizer.setSimulationActive(false);
+    }
+    
+    animateCurrentFlow() {
+        if (!this.currentSource || !this.voltageMap) {
+            alert('Please run a simulation first');
+            return;
+        }
+        
+        // Create animated current flow visualization
+        this.createCurrentFlowAnimation();
+    }
+    
+    createCurrentFlowAnimation() {
+        // Clear existing animations
+        this.clearAnimations();
+        
+        const source = this.instances.find(i => i.id === this.currentSource);
+        if (!source) return;
+        
+        // Create multiple current flow paths
+        const numPaths = 5;
+        const paths = this.generateCurrentPaths(source, numPaths);
+        
+        paths.forEach((path, index) => {
+            setTimeout(() => {
+                this.animateCurrentPath(path, index);
+            }, index * 200);
+        });
+    }
+    
+    generateCurrentPaths(source, numPaths) {
+        const paths = [];
+        
+        // Generate different paths from source to various endpoints
+        for (let i = 0; i < numPaths; i++) {
+            const path = [];
+            let currentRow = source.row;
+            let currentCol = source.col;
+            
+            // Generate a path towards a random endpoint
+            const targetRow = Math.floor(Math.random() * this.gridSize.rows);
+            const targetCol = Math.floor(Math.random() * this.gridSize.cols);
+            
+            // Simple pathfinding towards target
+            while (currentRow !== targetRow || currentCol !== targetCol) {
+                path.push({ row: currentRow, col: currentCol });
+                
+                // Move towards target
+                if (currentRow < targetRow) currentRow++;
+                else if (currentRow > targetRow) currentRow--;
+                else if (currentCol < targetCol) currentCol++;
+                else if (currentCol > targetCol) currentCol--;
+            }
+            
+            path.push({ row: targetRow, col: targetCol });
+            paths.push(path);
+        }
+        
+        return paths;
+    }
+    
+    animateCurrentPath(path, pathIndex) {
+        const colors = ['#22d3ee', '#38bdf8', '#67e8f9', '#a78bfa', '#f472b6'];
+        const color = colors[pathIndex % colors.length];
+        
+        let step = 0;
+        const animationInterval = setInterval(() => {
+            if (step >= path.length) {
+                clearInterval(animationInterval);
+                return;
+            }
+            
+            const currentPos = path[step];
+            
+            // Add animated particle at current position
+            const particleTrace = {
+                x: [currentPos.col],
+                y: [currentPos.row],
+                mode: 'markers',
+                marker: {
+                    color: color,
+                    size: 8,
+                    symbol: 'circle',
+                    line: { color: '#e0e5f0', width: 1 }
+                },
+                showlegend: false,
+                hoverinfo: 'skip'
+            };
+            
+            Plotly.addTraces(this.containerId, [particleTrace]);
+            
+            // Remove particle after a short delay
+            setTimeout(() => {
+                const currentData = document.getElementById(this.containerId).data;
+                if (currentData && currentData.length > 0) {
+                    Plotly.deleteTraces(this.containerId, [currentData.length - 1]);
+                }
+            }, 500);
+            
+            step++;
+        }, 100);
+        
+        this.animationIntervals.push(animationInterval);
+    }
+    
+    clearAnimations() {
+        this.animationIntervals.forEach(interval => clearInterval(interval));
+        this.animationTimeouts.forEach(timeout => clearTimeout(timeout));
+        this.animationIntervals = [];
+        this.animationTimeouts = [];
+    }
+    
+    toggleVoltageDisplay(show) {
+        this.showVoltages = show;
+        if (this.voltageMap) {
+            this.updatePlot();
+        }
+    }
+    
+    toggleCurrentFlowDisplay(show) {
+        this.showCurrentFlow = show;
+        // Implementation depends on current flow visualization
+    }
+    
+    resize() {
+        Plotly.Plots.resize(this.containerId);
+    }
+}
+
+// Export for module usage
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PlotlyGridVisualizer;
+}

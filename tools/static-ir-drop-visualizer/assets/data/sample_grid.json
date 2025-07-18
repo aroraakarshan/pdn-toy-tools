@@ -1,0 +1,54 @@
+{
+  "grid": {
+    "width": 10,
+    "height": 10,
+    "description": "Static IR Drop Analysis Grid",
+    "domains": [
+      {
+        "id": "A",
+        "name": "Domain A",
+        "color": "#FF6B6B",
+        "bumps": [
+          { "row": 1, "col": 2, "resistance": 0.015 },
+          { "row": 3, "col": 4, "resistance": 0.022 },
+          { "row": 7, "col": 8, "resistance": 0.018 },
+          { "row": 5, "col": 6, "resistance": 0.025 }
+        ]
+      }
+    ],
+    "instances": [
+      { "id": "instance-0", "row": 1, "col": 1, "resistance": 0.85 },
+      { "id": "instance-1", "row": 3, "col": 7, "resistance": 1.25 },
+      { "id": "instance-2", "row": 5, "col": 3, "resistance": 0.94 },
+      { "id": "instance-3", "row": 7, "col": 6, "resistance": 1.67 },
+      { "id": "instance-4", "row": 2, "col": 9, "resistance": 0.78 },
+      { "id": "instance-5", "row": 8, "col": 1, "resistance": 1.42 },
+      { "id": "instance-6", "row": 9, "col": 8, "resistance": 1.18 }
+    ],
+    "gridResistances": {
+      "description": "Default resistance values for grid segments",
+      "horizontalRange": { "min": 0.05, "max": 0.2 },
+      "verticalRange": { "min": 0.05, "max": 0.2 },
+      "units": "ohms"
+    }
+  },
+  "simulationDefaults": {
+    "currentRange": { "min": 10, "max": 1000, "default": 100, "units": "mA" },
+    "supplyVoltage": { "value": 1.0, "units": "V" },
+    "convergenceThreshold": 1e-6,
+    "maxIterations": 1000
+  },
+  "visualizationSettings": {
+    "colorScale": {
+      "lowIRDrop": "#0066cc",
+      "mediumIRDrop": "#ffcc00",
+      "highIRDrop": "#ff3300"
+    },
+    "animation": {
+      "particleCount": 50,
+      "particleLifetime": 3000,
+      "defaultSpeed": 1.0,
+      "speedRange": { "min": 0.5, "max": 3.0 }
+    }
+  }
+}
