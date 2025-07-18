@@ -145,14 +145,16 @@
                     
                     <button id="simulateIR" class="btn btn-accent">Simulate IR Drop</button>
                     <button id="clearSimulation" class="btn btn-secondary">Clear Simulation</button>
-                    <button id="animateFlow" class="btn btn-secondary">Animate Current Flow</button>
                 </div>
 
                 <div class="panel-section">
-                    <h3>Animation Controls</h3>
+                    <h3>View Controls</h3>
                     <div class="control-group">
-                        <label for="animationSpeed">Speed:</label>
-                        <input type="range" id="animationSpeed" min="0.5" max="3" step="0.1" value="1">
+                        <label for="displayMode">Display Mode:</label>
+                        <select id="displayMode">
+                            <option value="voltage">Voltage Drop</option>
+                            <option value="current">Current Density</option>
+                        </select>
                         <span id="speedValue">1x</span>
                     </div>
                     <div class="control-group">
@@ -235,7 +237,6 @@
                         <li><strong>Select Current Source:</strong> Choose an instance to act as the current source</li>
                         <li><strong>Set Current:</strong> Adjust the current value using the slider (10-1000mA)</li>
                         <li><strong>Simulate IR Drop:</strong> Click "Simulate IR Drop" to calculate and visualize voltage distribution</li>
-                        <li><strong>Animate Current Flow:</strong> Visualize how current flows through the network with animated particles</li>
                     </ol>
                     
                     <h3>Current Features:</h3>
@@ -245,8 +246,7 @@
                         <li><strong>Instance Sources:</strong> 7 scattered instances that can act as current sources</li>
                         <li><strong>Color-coded Visualization:</strong> Heat map showing voltage levels across the grid</li>
                         <li><strong>Real-time Analysis:</strong> Live voltage calculations and IR drop measurements</li>
-                        <li><strong>Current Flow Animation:</strong> Animated particles showing current distribution</li>
-                        <li><strong>Interactive Controls:</strong> Adjustable current levels and animation speed</li>
+                        <li><strong>Interactive Controls:</strong> Adjustable current levels and display modes</li>
                         <li><strong>Numerical Analysis:</strong> Detailed voltage and current measurements</li>
                     </ul>
                     
@@ -268,7 +268,6 @@
     </div>
 
     <script src="assets/js/ir-drop-engine.js"></script>
-    <script src="assets/js/animation.js"></script>
     <script src="assets/js/plotly-grid.js"></script>
     <script src="assets/js/visualizer.js"></script>
     <script>

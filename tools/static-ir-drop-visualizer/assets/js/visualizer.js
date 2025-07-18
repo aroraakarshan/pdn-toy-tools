@@ -4,12 +4,10 @@ class IRDropVisualizer {
     constructor() {
         this.grid = null;
         this.irEngine = null;
-        this.animationEngine = null;
         this.currentSource = null;
         this.currentValue = 100; // mA
         this.selectedSources = new Map(); // Map of instance ID to current value
         this.showVoltages = true;
-        this.showCurrentFlow = true;
         this.tooltip = null;
         this.simulationActive = false;
         
@@ -26,19 +24,9 @@ class IRDropVisualizer {
         
         // Initialize IR drop engine
         this.irEngine = new IRDropEngine();
-        this.animationEngine = new AnimationEngine();
     }
     
     setupEventListeners() {
-        // Animation speed control
-        document.getElementById('animationSpeed').addEventListener('input', (e) => {
-            const speed = parseFloat(e.target.value);
-            document.getElementById('speedValue').textContent = speed + 'x';
-            if (this.animationEngine) {
-                this.animationEngine.setSpeed(speed);
-            }
-        });
-        
         // Button events
         document.getElementById('generateNetwork').addEventListener('click', () => {
             if (window.plotlyGrid) {
@@ -61,12 +49,6 @@ class IRDropVisualizer {
             }
         });
         
-        document.getElementById('animateFlow').addEventListener('click', () => {
-            if (window.plotlyGrid) {
-                window.plotlyGrid.animateCurrentFlow();
-            }
-        });
-        
         document.getElementById('resetBtn').addEventListener('click', () => {
             this.resetVisualization();
         });
@@ -80,13 +62,6 @@ class IRDropVisualizer {
             this.showVoltages = e.target.checked;
             if (window.plotlyGrid) {
                 window.plotlyGrid.toggleVoltageDisplay(this.showVoltages);
-            }
-        });
-        
-        document.getElementById('showCurrentFlow').addEventListener('change', (e) => {
-            this.showCurrentFlow = e.target.checked;
-            if (window.plotlyGrid) {
-                window.plotlyGrid.toggleCurrentFlowDisplay(this.showCurrentFlow);
             }
         });
         
@@ -234,10 +209,6 @@ class IRDropVisualizer {
     
     getShowVoltages() {
         return this.showVoltages;
-    }
-    
-    getShowCurrentFlow() {
-        return this.showCurrentFlow;
     }
     
     setSimulationActive(active) {
