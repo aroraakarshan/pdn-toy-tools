@@ -660,32 +660,50 @@ for (let i = 1; i < tracks.length; i++) {
 if (tracks[i].totalR < tracks[winIdx].totalR) winIdx = i;
 }
 
-// Brighten winner, dim others
+// Dim all existing completed tubes
 pathGroup.traverse((obj: any) => {
 if (obj.userData?.trackIdx !== undefined) {
 const mat = obj.material as any;
-if (obj.userData.trackIdx === winIdx) {
-mat.opacity = 1.0;
-mat.emissiveIntensity = 0.8;
-obj.scale.set(2.0, 2.0, 2.0);
-} else {
-mat.opacity = 0.15;
-mat.emissiveIntensity = 0.05;
-}
+mat.opacity = 0.08;
+mat.emissiveIntensity = 0.02;
 }
 });
 
-// Camera zooms toward winner
+// Re-draw the winning path as a BRIGHT, THICK, glowing tube on top
 const winPts = tracks[winIdx].pts;
+const winColor = PATH_COLORS[winIdx % PATH_COLORS.length];
+const curvePath = new (THREE.CurvePath as any)();
+for (let i = 0; i < winPts.length - 1; i++) {
+curvePath.add(new THREE.LineCurve3(winPts[i], winPts[i + 1]));
+}
+const winTubeGeo = new THREE.TubeGeometry(curvePath, winPts.length * 8, 0.12, 12, false);
+const winTubeMat = new THREE.MeshStandardMaterial({
+color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 0.9,
+transparent: true, opacity: 1.0, roughness: 0.2, metalness: 0.8
+});
+const winTube = new THREE.Mesh(winTubeGeo, winTubeMat);
+pathGroup.add(winTube);
+
+// Add bright flowing particles on the winner
+for (let p = 0; p < 5; p++) {
+const fpMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const fp = new THREE.Mesh(particleGeo, fpMat);
+fp.scale.setScalar(0.7);
+const fpLight = new THREE.PointLight(0xffd700, 0.6, 3.0);
+fp.add(fpLight);
+pathGroup.add(fp);
+flowParticles.push({ mesh: fp, pts: winPts, phase: p / 5, speed: 0.0005 });
+}
+
+// Camera zooms toward winner
 const mid = winPts[Math.floor(winPts.length / 2)];
 const winCamPos = new THREE.Vector3(mid.x + 6, mid.y + 5, mid.z + 8);
 smoothCameraTo(winCamPos, mid.clone());
 
-// Winner label — positioned at the bump (end of path) so it's clear what it points to
+// Winner label at the bump end with arrow
 const winEnd = winPts[winPts.length - 1];
 const winStart = winPts[0];
 
-// Arrow line from label to the winning path's tube
 const arrowGeo = new THREE.BufferGeometry().setFromPoints([
 new THREE.Vector3(winEnd.x, winEnd.y + 1.6, winEnd.z),
 new THREE.Vector3(winEnd.x, winEnd.y + 0.3, winEnd.z)
@@ -693,27 +711,15 @@ new THREE.Vector3(winEnd.x, winEnd.y + 0.3, winEnd.z)
 const arrowLine = new THREE.Line(arrowGeo, new THREE.LineBasicMaterial({ color: 0xffd700, linewidth: 2 }));
 pathGroup.add(arrowLine);
 
-// Label above the bump
-const winLabel1 = makeTextSprite(
-'SHORTEST PATH (SPR)',
-'#ffd700', 1.0
-);
+const winLabel1 = makeTextSprite('SHORTEST PATH (SPR)', '#ffd700', 1.0);
 winLabel1.position.set(winEnd.x, winEnd.y + 2.0, winEnd.z);
 labelGroup.add(winLabel1);
 
-// Resistance value below it
-const winLabel2 = makeTextSprite(
-tracks[winIdx].totalR.toFixed(4) + ' ohm',
-'#ffd700', 0.85
-);
+const winLabel2 = makeTextSprite(tracks[winIdx].totalR.toFixed(4) + ' ohm', '#ffd700', 0.85);
 winLabel2.position.set(winEnd.x, winEnd.y + 1.5, winEnd.z);
 labelGroup.add(winLabel2);
 
-// Also mark at the instance (start)
-const startLabel = makeTextSprite(
-'Source: ' + (tracks[winIdx].bumpLabel ? 'Instance' : ''),
-'#22c55e', 0.65
-);
+const startLabel = makeTextSprite('Source', '#22c55e', 0.65);
 startLabel.position.set(winStart.x, winStart.y - 0.3, winStart.z);
 labelGroup.add(startLabel);
 }
