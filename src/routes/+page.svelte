@@ -45,6 +45,7 @@
 
 <section class="hero">
 	<div class="hero-content" class:mounted>
+		<p class="author-badge">by <strong>Akarshan Arora</strong></p>
 		<h1>
 			<span class="gradient-text">PDN Toy Tools</span>
 		</h1>
@@ -193,6 +194,24 @@
 	.hero-content.mounted {
 		opacity: 1;
 		transform: translateY(0);
+	}
+
+	.author-badge {
+		display: inline-block;
+		font-size: 0.85rem;
+		color: var(--color-accent-blue);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		margin: 0 0 1rem;
+		padding: 0.35rem 1rem;
+		border: 1px solid rgba(79, 143, 247, 0.3);
+		border-radius: 20px;
+		background: rgba(79, 143, 247, 0.08);
+	}
+
+	.author-badge strong {
+		color: var(--color-text-primary);
+		font-weight: 700;
 	}
 
 	.hero h1 {
