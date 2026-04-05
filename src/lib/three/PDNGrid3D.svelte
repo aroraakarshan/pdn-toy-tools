@@ -786,32 +786,18 @@ smoothCameraTo(overviewPos, overviewLook);
 return;
 }
 
-// Tracer position on path
+// Tracer moves along the path
 const tracerT = Math.min(followProgress + 0.02, 1);
 const tracerPos = followPathCurve.getPointAt(tracerT);
 followTracer.position.copy(tracerPos);
 
-// Camera rides just behind the tracer, looking forward
-const tangent = followPathCurve.getTangentAt(followProgress);
-const behind = tangent.clone().negate();
+// Stable drone-style camera: fixed offset, heavy damping
+// No direction-based offset — eliminates nausea from via transitions
+const targetCamPos = tracerPos.clone().add(new THREE.Vector3(3, 2.0, 3));
+const targetLookAt = tracerPos.clone();
 
-// For mostly-vertical segments (vias), shift camera to the side
-let camOffset: InstanceType<typeof THREE.Vector3>;
-if (Math.abs(tangent.y) > 0.7) {
-const side = new THREE.Vector3(1, 0, 0.5).normalize();
-camOffset = side.multiplyScalar(1.2).add(new THREE.Vector3(0, 0.3, 0));
-} else {
-camOffset = behind.multiplyScalar(1.8).add(new THREE.Vector3(0, 0.7, 0));
-}
-
-const camPos = followPathCurve.getPointAt(followProgress).add(camOffset);
-
-// Look well ahead of the tracer
-const lookT = Math.min(followProgress + 0.06, 1);
-const lookAt = followPathCurve.getPointAt(lookT);
-
-camera.position.copy(camPos);
-controls.target.copy(lookAt);
+camera.position.lerp(targetCamPos, 0.025);
+controls.target.lerp(targetLookAt, 0.04);
 controls.update();
 }
 
