@@ -475,6 +475,7 @@ let followProgress = 0;
 let followActive = false;
 
 function clearPathGroup() {
+if (followTracer) { pathGroup.remove(followTracer); followTracer = null; }
 pathGroup.clear();
 labelGroup.clear();
 tracks = [];
@@ -483,6 +484,7 @@ animActive = false;
 winnerDone = false;
 followTrackIdx = -1;
 followActive = false;
+followPathCurve = null;
 }
 
 function startAnimation(allPaths: PathResult[]) {
@@ -717,26 +719,33 @@ startLabel.position.set(winStart.x, winStart.y - 0.3, winStart.z);
 labelGroup.add(startLabel);
 }
 
-// ── Follow path camera ──
-let followCurve: any = null;
-let followLookCurve: any = null;
+// ── Follow path camera (first-person ride-along) ──
+let followPathCurve: any = null;
+let followTracer: any = null;
 
 function startFollowPath(trackIdx: number) {
 const track = tracks[trackIdx];
 if (!track || track.pts.length < 2) return;
 
+// Clean up previous tracer if any
+if (followTracer) { pathGroup.remove(followTracer); followTracer = null; }
+
 followTrackIdx = trackIdx;
 followProgress = 0;
 followActive = true;
 
-// Build smooth spline curves for camera position and look-at target
-const camPts = track.pts.map(p =>
-new THREE.Vector3(p.x + 5, p.y + 3, p.z + 4)
-);
-followCurve = new THREE.CatmullRomCurve3(camPts, false, 'catmullrom', 0.3);
-followLookCurve = new THREE.CatmullRomCurve3(
+// Smooth spline through path points
+followPathCurve = new THREE.CatmullRomCurve3(
 track.pts.map(p => p.clone()), false, 'catmullrom', 0.3
 );
+
+// Create visible tracer particle — the thing camera follows
+const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+followTracer = new THREE.Mesh(particleGeo, tracerMat);
+followTracer.scale.setScalar(2.5);
+const tracerGlow = new THREE.PointLight(0x4f8ff7, 2.5, 8.0);
+followTracer.add(tracerGlow);
+pathGroup.add(followTracer);
 
 // Highlight followed path, dim everything else
 pathGroup.traverse((obj: any) => {
@@ -755,17 +764,21 @@ mat.emissiveIntensity = 0.04;
 onPathClick?.(trackIdx, track.bumpLabel, track.totalR);
 }
 
+function cleanupFollow() {
+if (followTracer) { pathGroup.remove(followTracer); followTracer = null; }
+followActive = false;
+followTrackIdx = -1;
+followPathCurve = null;
+}
+
 function tickFollowCamera() {
 if (!followActive || !followMode || followTrackIdx < 0) return;
-if (!followCurve || !followLookCurve) { followActive = false; return; }
+if (!followPathCurve) { cleanupFollow(); return; }
 
 followProgress += 0.003 * localAnimSpeed;
 
 if (followProgress >= 1) {
-followActive = false;
-followTrackIdx = -1;
-followCurve = null;
-followLookCurve = null;
+cleanupFollow();
 if (winnerDone) restoreWinnerHighlight();
 const overviewPos = new THREE.Vector3(cx + 10, midY + 10, cz + 16);
 const overviewLook = new THREE.Vector3(cx, midY, cz);
@@ -773,9 +786,29 @@ smoothCameraTo(overviewPos, overviewLook);
 return;
 }
 
-// Smooth spline-based camera position and look-at
-const camPos = followCurve.getPointAt(followProgress);
-const lookAt = followLookCurve.getPointAt(Math.min(followProgress + 0.06, 1));
+// Tracer position on path
+const tracerT = Math.min(followProgress + 0.02, 1);
+const tracerPos = followPathCurve.getPointAt(tracerT);
+followTracer.position.copy(tracerPos);
+
+// Camera rides just behind the tracer, looking forward
+const tangent = followPathCurve.getTangentAt(followProgress);
+const behind = tangent.clone().negate();
+
+// For mostly-vertical segments (vias), shift camera to the side
+let camOffset: InstanceType<typeof THREE.Vector3>;
+if (Math.abs(tangent.y) > 0.7) {
+const side = new THREE.Vector3(1, 0, 0.5).normalize();
+camOffset = side.multiplyScalar(1.2).add(new THREE.Vector3(0, 0.3, 0));
+} else {
+camOffset = behind.multiplyScalar(1.8).add(new THREE.Vector3(0, 0.7, 0));
+}
+
+const camPos = followPathCurve.getPointAt(followProgress).add(camOffset);
+
+// Look well ahead of the tracer
+const lookT = Math.min(followProgress + 0.06, 1);
+const lookAt = followPathCurve.getPointAt(lookT);
 
 camera.position.copy(camPos);
 controls.target.copy(lookAt);
@@ -852,10 +885,7 @@ lastTime = now;
 
 // Cancel follow if followMode toggled off
 if (!followMode && followActive) {
-followActive = false;
-followTrackIdx = -1;
-followCurve = null;
-followLookCurve = null;
+cleanupFollow();
 if (winnerDone) restoreWinnerHighlight();
 }
 
