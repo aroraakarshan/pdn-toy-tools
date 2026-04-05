@@ -155,17 +155,19 @@ let clickables: any[] = [];
 // ── Text sprite helper ──
 function makeTextSprite(text: string, cssColor: string, scale = 0.7): any {
 const canvas = document.createElement('canvas');
-canvas.width = 256; canvas.height = 48;
+canvas.width = 512; canvas.height = 64;
 const ctx = canvas.getContext('2d')!;
-ctx.font = 'bold 22px JetBrains Mono, monospace';
+ctx.font = 'bold 26px Arial, Helvetica, sans-serif';
 ctx.fillStyle = cssColor;
-ctx.shadowColor = 'rgba(0,0,0,0.9)';
-ctx.shadowBlur = 5;
-ctx.fillText(text, 4, 32);
+ctx.shadowColor = 'rgba(0,0,0,0.95)';
+ctx.shadowBlur = 6;
+ctx.shadowOffsetX = 1;
+ctx.shadowOffsetY = 1;
+ctx.fillText(text, 6, 42);
 const tex = new THREE.CanvasTexture(canvas);
 const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
 const sp = new THREE.Sprite(mat);
-sp.scale.set(scale * 2.0, scale * 0.38, 1);
+sp.scale.set(scale * 3.0, scale * 0.45, 1);
 return sp;
 }
 
@@ -417,7 +419,7 @@ LAYER_YS[currentLayer] + PATH_LIFT + 0.20,
 );
 labels.push({
 pos: midPos,
-text: `${res.toFixed(3)}Ω`,
+text: `${res.toFixed(3)} ohm`,
 afterSeg: pts.length - 1
 });
 }
@@ -569,7 +571,7 @@ pathGroup.add(tube);
 // Label at the end (bump)
 const endPt = pts[pts.length - 1];
 const rLabel = makeTextSprite(
-track.bumpLabel + ': ' + track.totalR.toFixed(3) + '\u03A9',
+track.bumpLabel + ': ' + track.totalR.toFixed(3) + ' ohm',
 cssColor, 0.65
 );
 rLabel.position.set(endPt.x, endPt.y + 0.3 + track.idx * 0.25, endPt.z);
@@ -679,13 +681,41 @@ const mid = winPts[Math.floor(winPts.length / 2)];
 const winCamPos = new THREE.Vector3(mid.x + 6, mid.y + 5, mid.z + 8);
 smoothCameraTo(winCamPos, mid.clone());
 
-// Winner label
-const winSp = makeTextSprite(
-'\u2B50 LOWEST RESISTANCE = SPR',
-'#ffd700', 1.2
+// Winner label — positioned at the bump (end of path) so it's clear what it points to
+const winEnd = winPts[winPts.length - 1];
+const winStart = winPts[0];
+
+// Arrow line from label to the winning path's tube
+const arrowGeo = new THREE.BufferGeometry().setFromPoints([
+new THREE.Vector3(winEnd.x, winEnd.y + 1.6, winEnd.z),
+new THREE.Vector3(winEnd.x, winEnd.y + 0.3, winEnd.z)
+]);
+const arrowLine = new THREE.Line(arrowGeo, new THREE.LineBasicMaterial({ color: 0xffd700, linewidth: 2 }));
+pathGroup.add(arrowLine);
+
+// Label above the bump
+const winLabel1 = makeTextSprite(
+'SHORTEST PATH (SPR)',
+'#ffd700', 1.0
 );
-winSp.position.set(mid.x, mid.y + 1.2, mid.z);
-labelGroup.add(winSp);
+winLabel1.position.set(winEnd.x, winEnd.y + 2.0, winEnd.z);
+labelGroup.add(winLabel1);
+
+// Resistance value below it
+const winLabel2 = makeTextSprite(
+tracks[winIdx].totalR.toFixed(4) + ' ohm',
+'#ffd700', 0.85
+);
+winLabel2.position.set(winEnd.x, winEnd.y + 1.5, winEnd.z);
+labelGroup.add(winLabel2);
+
+// Also mark at the instance (start)
+const startLabel = makeTextSprite(
+'Source: ' + (tracks[winIdx].bumpLabel ? 'Instance' : ''),
+'#22c55e', 0.65
+);
+startLabel.position.set(winStart.x, winStart.y - 0.3, winStart.z);
+labelGroup.add(startLabel);
 }
 
 function tickFlowParticles() {
