@@ -1,5 +1,11 @@
-# Excluded files and directories for GitHub Pages
+# Dependencies
 node_modules/
+
+# Build output
+build/
+.svelte-kit/
+
+# OS / Editor
 .DS_Store
 *.log
 .vscode/

@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+:root {
+	/* Dark theme (default) */
+	--color-bg-primary: #0f1117;
+	--color-bg-secondary: #1a1d27;
+	--color-bg-tertiary: #242836;
+	--color-bg-card: #1e2230;
+	--color-border: #2d3348;
+	--color-border-hover: #4a5280;
+
+	--color-text-primary: #e8eaf0;
+	--color-text-secondary: #9ca3bf;
+	--color-text-muted: #6b7294;
+
+	--color-accent-blue: #4f8ff7;
+	--color-accent-cyan: #22d3ee;
+	--color-accent-purple: #a78bfa;
+	--color-accent-green: #34d399;
+	--color-accent-amber: #fbbf24;
+	--color-accent-red: #f87171;
+
+	--color-gradient-start: #4f8ff7;
+	--color-gradient-end: #a78bfa;
+
+	/* Canvas colors */
+	--color-canvas-bg: #141722;
+	--color-canvas-grid: #2a2f42;
+	--color-canvas-node: #4a5280;
+	--color-canvas-edge: #3d4460;
+
+	/* Shadows */
+	--shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
+	--shadow-glow: 0 0 20px rgba(79, 143, 247, 0.15);
+
+	/* Sizing */
+	--sidebar-width: 320px;
+	--nav-height: 56px;
+}
+
+/* Base styles */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	font-family:
+		'Inter',
+		system-ui,
+		-apple-system,
+		sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--color-bg-primary);
+	color: var(--color-text-primary);
+	min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--color-border);
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-border-hover);
+}
+
+/* Utility classes */
+.gradient-text {
+	background: linear-gradient(135deg, var(--color-gradient-start), var(--color-gradient-end));
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+/* Code/mono font */
+code,
+.mono {
+	font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
