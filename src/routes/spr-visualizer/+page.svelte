@@ -209,6 +209,7 @@ disabled={!selectedSource || animating}>
 <button class="btn btn-ghost" onclick={reset}>✕ Clear</button>
 <button class="btn btn-ghost" onclick={newGrid}>🔄 New Grid</button>
 </div>
+<div class="button-sep"></div>
 
 <!-- ── NARRATION ── -->
 <div class="narration">
@@ -383,6 +384,7 @@ transition: all 0.15s ease; white-space: nowrap;
 .btn-accent:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
 .btn-ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
 .btn-ghost:hover { background: var(--color-bg-tertiary); }
+	.button-sep { height: 1px; background: var(--color-border); margin: 0.25rem 0 0.5rem; }
 
 /* Narration */
 .narration {
