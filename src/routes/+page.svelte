@@ -285,7 +285,7 @@
 	}
 
 	.section h2 {
-		font-size: 2rem;
+		font-size: 2.2rem;
 		text-align: center;
 		margin: 0 0 1.5rem;
 	}
@@ -296,6 +296,7 @@
 		max-width: 700px;
 		margin: 0 auto 3rem;
 		line-height: 1.8;
+		font-size: 1.1rem;
 	}
 
 	/* Scroll-in animation */
@@ -371,12 +372,13 @@
 	}
 
 	.tool-card h3 {
-		font-size: 1.25rem;
+		font-size: 1.4rem;
 		margin: 0 0 0.75rem;
 	}
 
 	.tool-card p {
 		color: var(--color-text-secondary);
+		font-size: 1.05rem;
 		line-height: 1.6;
 		flex: 1;
 		margin: 0 0 1.25rem;
@@ -385,7 +387,7 @@
 	.tool-cta {
 		color: var(--color-accent-blue);
 		font-weight: 600;
-		font-size: 0.9rem;
+		font-size: 1rem;
 		transition: gap 0.2s ease;
 	}
 
@@ -417,19 +419,19 @@
 	}
 
 	.benefit-icon {
-		font-size: 1.5rem;
+		font-size: 1.8rem;
 		display: block;
 		margin-bottom: 0.75rem;
 	}
 
 	.benefit-card h4 {
 		margin: 0 0 0.5rem;
-		font-size: 1rem;
+		font-size: 1.15rem;
 	}
 
 	.benefit-card p {
 		color: var(--color-text-muted);
-		font-size: 0.9rem;
+		font-size: 1.05rem;
 		line-height: 1.6;
 		margin: 0;
 	}
@@ -440,7 +442,7 @@
 		padding: 2rem;
 		border-top: 1px solid var(--color-border);
 		color: var(--color-text-muted);
-		font-size: 0.85rem;
+		font-size: 1rem;
 	}
 
 	.footer a {
