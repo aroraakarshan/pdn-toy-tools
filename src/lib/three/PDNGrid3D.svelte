@@ -411,47 +411,78 @@ pts.push(new THREE.Vector3(end.col, BUMP_BASE + BUMP_H / 2, end.row));
 return { pts, labels };
 }
 
-// ── Path animation state ──
+// ── PARALLEL PATH ANIMATION ──
+// All paths animate simultaneously — a "race" to each bump
 const PATH_COLORS: number[] = [0xff6b6b, 0x4f8ff7, 0x22c55e, 0xfbbf24, 0xa78bfa, 0xf472b6, 0x22d3ee, 0xfb923c];
 const PATH_CSS = ['#ff6b6b', '#4f8ff7', '#22c55e', '#fbbf24', '#a78bfa', '#f472b6', '#22d3ee', '#fb923c'];
 
+interface ParallelTrack {
+idx: number;
+pts: InstanceType<typeof THREE.Vector3>[];
+segIdx: number;
+segProgress: number;
+done: boolean;
+trailPositions: Float32Array;
+trailGeo: any;
+trailLine: any;
+particle: any;
+totalR: number;
+bumpLabel: string;
+}
+
+let tracks: ParallelTrack[] = [];
 let animActive = false;
-let currentAnimPaths: PathResult[] = [];
-let currentPathIdx = 0;
-let segIdx = 0;
-let segProgress = 0;
-let animPts: InstanceType<typeof THREE.Vector3>[] = [];
-let animLabels: { pos: InstanceType<typeof THREE.Vector3>; text: string; afterSeg: number }[] = [];
-let completedTubes: { tube: any; idx: number }[] = [];
-let trailLine: any = null;
-let trailPositions: Float32Array | null = null;
-let trailGeo: any = null;
-let particle: any = null;
-let interPathDelay = 0;
-let nodePause = 0;
 let localAnimSpeed = 1.0;
-let flowParticles: { mesh: any; pts: InstanceType<typeof THREE.Vector3>[]; phase: number; speed: number }[] = [];
-let shownLabelSegs = new Set<number>();
-let runningResistance = 0;
-let flatSegResistances: number[] = [];
 let winnerDone = false;
+let flowParticles: { mesh: any; pts: InstanceType<typeof THREE.Vector3>[]; phase: number; speed: number }[] = [];
 
 function clearPathGroup() {
 pathGroup.clear();
 labelGroup.clear();
-trailLine = null; trailGeo = null; trailPositions = null; particle = null;
-completedTubes = []; flowParticles = [];
-animActive = false; animPts = []; animLabels = [];
-shownLabelSegs.clear();
+tracks = [];
+flowParticles = [];
+animActive = false;
 winnerDone = false;
 }
 
 function startAnimation(allPaths: PathResult[]) {
 clearPathGroup();
 if (!allPaths.length) return;
-currentAnimPaths = allPaths;
-currentPathIdx = 0;
-interPathDelay = 0;
+
+tracks = allPaths.map((p, idx) => {
+const { pts } = pathTo3D(p.path);
+const maxV = pts.length + 2;
+const trailPositions = new Float32Array(maxV * 3);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+trailGeo.setDrawRange(0, 0);
+
+const color = PATH_COLORS[idx % PATH_COLORS.length];
+const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
+pathGroup.add(trailLine);
+
+const pMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+const particle = new THREE.Mesh(particleGeo, pMat);
+particle.position.copy(pts[0]);
+pathGroup.add(particle);
+const pLight = new THREE.PointLight(color, 0.4, 2.0);
+particle.add(pLight);
+
+return {
+idx,
+pts,
+segIdx: 0,
+segProgress: 0,
+done: false,
+trailPositions,
+trailGeo,
+trailLine,
+particle,
+totalR: p.totalResistance,
+bumpLabel: p.bumpLabel ?? `Bump ${idx + 1}`
+};
+});
+
 animActive = true;
 onAnimationStep?.({
 phase: 'started',
@@ -459,225 +490,158 @@ pathIdx: 0,
 totalPaths: allPaths.length,
 runningTotal: 0
 });
-setupTrailForPath(0);
 }
 
-function setupTrailForPath(idx: number) {
-if (trailLine) pathGroup.remove(trailLine);
-if (particle) pathGroup.remove(particle);
+function tickAnimation(dt: number) {
+if (!animActive || !tracks.length) return;
 
-const flat = currentAnimPaths[idx].path;
-const result = pathTo3D(flat);
-animPts = result.pts;
-animLabels = result.labels;
-shownLabelSegs.clear();
+const speed = 0.028 * localAnimSpeed;
+let allDone = true;
 
-const maxV = animPts.length + 2;
-trailPositions = new Float32Array(maxV * 3);
-trailGeo = new THREE.BufferGeometry();
-trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-trailGeo.setDrawRange(0, 0);
+for (const track of tracks) {
+if (track.done) continue;
+allDone = false;
 
-const color = PATH_COLORS[idx % PATH_COLORS.length];
-trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
-pathGroup.add(trailLine);
+track.segProgress += speed;
+const pts = track.pts;
+const totalSegs = pts.length - 1;
 
-const pMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
-particle = new THREE.Mesh(particleGeo, pMat);
-particle.position.copy(animPts[0]);
-pathGroup.add(particle);
-const pLight = new THREE.PointLight(0xffd700, 0.7, 3.0);
-particle.add(pLight);
+if (track.segProgress >= 1) {
+track.segProgress = 0;
+track.segIdx++;
 
-segIdx = 0; segProgress = 0; nodePause = 0;
+if (track.segIdx >= totalSegs) {
+track.done = true;
+// Convert trail to tube
+pathGroup.remove(track.trailLine);
+pathGroup.remove(track.particle);
 
-// Precompute flat-path segment resistances for running total
-const flatP = currentAnimPaths[idx].path;
-flatSegResistances = [];
-runningResistance = currentAnimPaths[idx].path.length > 0 ?
-(grid.instances.find(inst => inst.row === flatP[0].row && inst.col === flatP[0].col)?.resistance ?? 0) : 0;
-for (let i = 1; i < flatP.length; i++) {
-const r = getEdgeResistance(grid, flatP[i-1].row, flatP[i-1].col, flatP[i].row, flatP[i].col);
-flatSegResistances.push(r ?? 0);
-}
-onAnimationStep?.({
-phase: 'tracing',
-pathIdx: idx,
-totalPaths: currentAnimPaths.length,
-runningTotal: runningResistance
-});
-}
-
-function addCompletedPath(idx: number) {
-const flat = currentAnimPaths[idx].path;
-const { pts } = pathTo3D(flat);
-const color = PATH_COLORS[idx % PATH_COLORS.length];
-const cssColor = PATH_CSS[idx % PATH_CSS.length];
-
+const color = PATH_COLORS[track.idx % PATH_COLORS.length];
+const cssColor = PATH_CSS[track.idx % PATH_CSS.length];
 const curvePath = new (THREE.CurvePath as any)();
 for (let i = 0; i < pts.length - 1; i++) {
 curvePath.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
 }
-const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 6, 0.045, 8, false);
-const tubeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 });
+const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 5, 0.04, 8, false);
+const tubeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
 const tube = new THREE.Mesh(tubeGeo, tubeMat);
+tube.userData = { trackIdx: track.idx };
 pathGroup.add(tube);
-completedTubes.push({ tube, idx });
 
-// Total resistance label on each completed path
-const totalR = currentAnimPaths[idx].totalResistance;
-const mid = pts[Math.floor(pts.length / 2)];
-const offset = idx * 0.4;
+// Label at the end (bump)
+const endPt = pts[pts.length - 1];
 const rLabel = makeTextSprite(
-'Path ' + (idx + 1) + ': ' + totalR.toFixed(3) + 'Ω',
-cssColor, 0.75
+track.bumpLabel + ': ' + track.totalR.toFixed(3) + '\u03A9',
+cssColor, 0.65
 );
-rLabel.position.set(mid.x, mid.y + 0.45 + offset, mid.z);
+rLabel.position.set(endPt.x, endPt.y + 0.3 + track.idx * 0.25, endPt.z);
 labelGroup.add(rLabel);
 
 // Flowing particles
-for (let p = 0; p < 3; p++) {
+for (let p = 0; p < 2; p++) {
 const fpMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
 const fp = new THREE.Mesh(particleGeo, fpMat);
-fp.scale.setScalar(0.45);
-const fpLight = new THREE.PointLight(0xffd700, 0.2, 1.2);
-fp.add(fpLight);
+fp.scale.setScalar(0.35);
 pathGroup.add(fp);
-flowParticles.push({ mesh: fp, pts, phase: p / 3, speed: 0.0004 + Math.random() * 0.0002 });
+flowParticles.push({ mesh: fp, pts, phase: p / 2, speed: 0.0004 + Math.random() * 0.0002 });
+}
+
+onAnimationStep?.({
+phase: 'pathDone',
+pathIdx: track.idx,
+totalPaths: tracks.length,
+finalR: track.totalR,
+runningTotal: track.totalR
+});
+continue;
+}
+}
+
+// Update trail
+const tp = track.trailPositions;
+const tg = track.trailGeo;
+for (let i = 0; i <= track.segIdx && i < pts.length; i++) {
+tp[i * 3]     = pts[i].x;
+tp[i * 3 + 1] = pts[i].y;
+tp[i * 3 + 2] = pts[i].z;
+}
+const vi = track.segIdx + 1;
+const c = pts[track.segIdx];
+const n = pts[Math.min(track.segIdx + 1, totalSegs)];
+tp[vi * 3]     = c.x + (n.x - c.x) * track.segProgress;
+tp[vi * 3 + 1] = c.y + (n.y - c.y) * track.segProgress;
+tp[vi * 3 + 2] = c.z + (n.z - c.z) * track.segProgress;
+tg.setDrawRange(0, vi + 1);
+tg.attributes.position.needsUpdate = true;
+
+// Move particle
+if (track.particle && track.segIdx < pts.length - 1) {
+const pc = pts[track.segIdx];
+const pn = pts[Math.min(track.segIdx + 1, pts.length - 1)];
+track.particle.position.set(
+pc.x + (pn.x - pc.x) * track.segProgress,
+pc.y + (pn.y - pc.y) * track.segProgress,
+pc.z + (pn.z - pc.z) * track.segProgress
+);
+}
+}
+
+// Emit tracing step for the first incomplete track
+const activeTrack = tracks.find(t => !t.done);
+if (activeTrack) {
+onAnimationStep?.({
+phase: 'tracing',
+pathIdx: tracks.filter(t => t.done).length,
+totalPaths: tracks.length,
+runningTotal: 0
+});
+}
+
+if (allDone) {
+animActive = false;
+setTimeout(() => highlightWinner(), 500);
+onAnimationStep?.({
+phase: 'allDone',
+pathIdx: 0,
+totalPaths: tracks.length,
+runningTotal: tracks[0]?.totalR ?? 0
+});
+onAnimationDone?.();
 }
 }
 
 function highlightWinner() {
-if (completedTubes.length <= 1 || winnerDone) return;
+if (tracks.length <= 1 || winnerDone) return;
 winnerDone = true;
 
-// ALL paths remain visible — winner brighter, others slightly dimmed
-for (const ct of completedTubes) {
-const mat = ct.tube.material as any;
-if (ct.idx === 0) {
-mat.opacity = 1.0;
-ct.tube.scale.set(1.5, 1.5, 1.5);
-} else {
-mat.opacity = 0.35;
-}
+// Find the winner (lowest totalR)
+let winIdx = 0;
+for (let i = 1; i < tracks.length; i++) {
+if (tracks[i].totalR < tracks[winIdx].totalR) winIdx = i;
 }
 
-// "SHORTEST" label on the winner path
-const { pts } = pathTo3D(currentAnimPaths[0].path);
-const mid = pts[Math.floor(pts.length / 2)];
-const winSp = makeTextSprite('⭐ SHORTEST RESISTANCE', '#ffd700', 1.1);
+// Brighten winner, dim others
+pathGroup.traverse((obj: any) => {
+if (obj.userData?.trackIdx !== undefined) {
+const mat = obj.material as any;
+if (obj.userData.trackIdx === winIdx) {
+mat.opacity = 1.0;
+obj.scale.set(1.6, 1.6, 1.6);
+} else {
+mat.opacity = 0.2;
+}
+}
+});
+
+// Winner label
+const winPts = tracks[winIdx].pts;
+const mid = winPts[Math.floor(winPts.length / 2)];
+const winSp = makeTextSprite(
+'\u2B50 LOWEST RESISTANCE = SPR',
+'#ffd700', 1.2
+);
 winSp.position.set(mid.x, mid.y + 1.2, mid.z);
 labelGroup.add(winSp);
-}
-
-function tickAnimation(dt: number) {
-if (!animActive || !currentAnimPaths.length) return;
-
-if (interPathDelay > 0) { interPathDelay -= dt; return; }
-if (nodePause > 0) { nodePause -= dt; return; }
-
-const pts = animPts;
-const totalSegs = pts.length - 1;
-// Moderate speed — fast enough to see, slow enough to follow
-const speed = 0.035 * localAnimSpeed;
-
-segProgress += speed;
-
-if (segProgress >= 1) {
-segProgress = 0;
-segIdx++;
-nodePause = 35 / localAnimSpeed;
-
-// Show resistance labels and update running total
-for (const lbl of animLabels) {
-if (lbl.afterSeg <= segIdx + 1 && !shownLabelSegs.has(lbl.afterSeg)) {
-shownLabelSegs.add(lbl.afterSeg);
-const cssColor = PATH_CSS[currentPathIdx % PATH_CSS.length];
-const sp = makeTextSprite(lbl.text, cssColor, 0.45);
-sp.position.copy(lbl.pos);
-labelGroup.add(sp);
-}
-}
-// Track running resistance from flat path segments
-const flatSegIdx = shownLabelSegs.size - 1;
-if (flatSegIdx >= 0 && flatSegIdx < flatSegResistances.length) {
-let total = grid.instances.find(inst => inst.row === currentAnimPaths[currentPathIdx].path[0].row && inst.col === currentAnimPaths[currentPathIdx].path[0].col)?.resistance ?? 0;
-for (let fi = 0; fi <= flatSegIdx && fi < flatSegResistances.length; fi++) {
-total += flatSegResistances[fi];
-}
-runningResistance = total;
-onAnimationStep?.({
-phase: 'tracing',
-pathIdx: currentPathIdx,
-totalPaths: currentAnimPaths.length,
-segmentR: flatSegResistances[flatSegIdx],
-runningTotal: runningResistance
-});
-}
-
-if (segIdx >= totalSegs) {
-// Path complete
-if (trailLine) pathGroup.remove(trailLine);
-if (particle) pathGroup.remove(particle);
-trailLine = null; particle = null;
-addCompletedPath(currentPathIdx);
-onAnimationStep?.({
-phase: 'pathDone',
-pathIdx: currentPathIdx,
-totalPaths: currentAnimPaths.length,
-finalR: currentAnimPaths[currentPathIdx].totalResistance,
-runningTotal: currentAnimPaths[currentPathIdx].totalResistance
-});
-currentPathIdx++;
-
-if (currentPathIdx < currentAnimPaths.length) {
-// Labels from previous paths stay visible
-interPathDelay = 500 / localAnimSpeed;
-setupTrailForPath(currentPathIdx);
-} else {
-animActive = false;
-if (currentAnimPaths.length > 1) {
-setTimeout(() => highlightWinner(), 400);
-}
-onAnimationStep?.({
-phase: 'allDone',
-pathIdx: 0,
-totalPaths: currentAnimPaths.length,
-runningTotal: currentAnimPaths[0].totalResistance
-});
-onAnimationDone?.();
-}
-return;
-}
-}
-
-// Update trail line
-if (trailPositions && trailGeo) {
-for (let i = 0; i <= segIdx && i < pts.length; i++) {
-trailPositions[i * 3]     = pts[i].x;
-trailPositions[i * 3 + 1] = pts[i].y;
-trailPositions[i * 3 + 2] = pts[i].z;
-}
-const vi = segIdx + 1;
-const c = pts[segIdx];
-const n = pts[Math.min(segIdx + 1, totalSegs)];
-trailPositions[vi * 3]     = c.x + (n.x - c.x) * segProgress;
-trailPositions[vi * 3 + 1] = c.y + (n.y - c.y) * segProgress;
-trailPositions[vi * 3 + 2] = c.z + (n.z - c.z) * segProgress;
-trailGeo.setDrawRange(0, vi + 1);
-trailGeo.attributes.position.needsUpdate = true;
-}
-
-// Move particle
-if (particle && segIdx < pts.length - 1) {
-const c = pts[segIdx];
-const n = pts[Math.min(segIdx + 1, pts.length - 1)];
-particle.position.set(
-c.x + (n.x - c.x) * segProgress,
-c.y + (n.y - c.y) * segProgress,
-c.z + (n.z - c.z) * segProgress
-);
-}
 }
 
 function tickFlowParticles() {

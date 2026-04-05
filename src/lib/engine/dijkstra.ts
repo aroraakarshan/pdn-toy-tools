@@ -1,4 +1,4 @@
-import type { Grid, PathResult, PathNode, Instance, Domain } from './types';
+import type { Grid, PathResult, PathNode, Instance, Domain, Bump } from './types';
 import { getEdgeResistance, findBumpAt } from './grid';
 
 interface DijkstraNode {
@@ -139,6 +139,96 @@ export function dijkstraSPR(
 	}
 
 	return { path, totalResistance };
+}
+
+/**
+ * Find shortest path from source to EACH bump in a domain individually.
+ * Returns one PathResult per reachable bump, sorted by resistance (lowest first).
+ */
+export function dijkstraToAllBumps(
+	grid: Grid,
+	source: Instance,
+	targetDomain: Domain
+): PathResult[] {
+	const { rows, cols } = grid.config;
+
+	// Run Dijkstra once from source to get distances to all grid nodes
+	const distances = new Map<string, number>();
+	const previous = new Map<string, string>();
+	const visited = new Set<string>();
+
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c < cols; c++) {
+			distances.set(`${r},${c}`, Infinity);
+		}
+	}
+
+	const sourceId = `${source.row},${source.col}`;
+	distances.set(sourceId, source.resistance);
+
+	while (true) {
+		let currentId: string | null = null;
+		let minDist = Infinity;
+		for (const [id, dist] of distances) {
+			if (!visited.has(id) && dist < minDist) {
+				minDist = dist;
+				currentId = id;
+			}
+		}
+		if (currentId === null || minDist === Infinity) break;
+		visited.add(currentId);
+
+		const [rowStr, colStr] = currentId.split(',');
+		const row = parseInt(rowStr);
+		const col = parseInt(colStr);
+
+		for (const [dr, dc] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+			const nr = row + dr;
+			const nc = col + dc;
+			if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+			const neighborId = `${nr},${nc}`;
+			if (visited.has(neighborId)) continue;
+			if (isBlocked(grid, nr, nc, source, targetDomain)) continue;
+
+			const edgeR = getEdgeResistance(grid, row, col, nr, nc);
+			if (edgeR === null) continue;
+
+			const alt = minDist + edgeR;
+			if (alt < (distances.get(neighborId) ?? Infinity)) {
+				distances.set(neighborId, alt);
+				previous.set(neighborId, currentId);
+			}
+		}
+	}
+
+	// Reconstruct path to each bump
+	const results: PathResult[] = [];
+	for (const bump of targetDomain.bumps) {
+		const bumpId = `${bump.row},${bump.col}`;
+		const gridDist = distances.get(bumpId);
+		if (gridDist === undefined || gridDist === Infinity) continue;
+
+		const totalResistance = gridDist + bump.resistance;
+
+		// Reconstruct path
+		const path: PathNode[] = [];
+		let cur: string | undefined = bumpId;
+		while (cur) {
+			const [r, c] = cur.split(',').map(Number);
+			path.unshift({ row: r, col: c });
+			cur = previous.get(cur);
+		}
+
+		results.push({
+			path,
+			totalResistance,
+			bumpId: bump.id,
+			bumpLabel: `Bump (${bump.row},${bump.col})`
+		});
+	}
+
+	results.sort((a, b) => a.totalResistance - b.totalResistance);
+	return results;
 }
 
 /** Check if a grid cell is blocked for pathfinding */

@@ -15,6 +15,6 @@ export type {
 	IRDropResult,
 	CanvasHitResult
 } from './types';
-export { dijkstraSPR } from './dijkstra';
+export { dijkstraSPR, dijkstraToAllBumps } from './dijkstra';
 export { yenKShortest } from './yen-k-shortest';
 export { solveIRDrop } from './gauss-seidel';

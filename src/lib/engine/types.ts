@@ -86,6 +86,8 @@ export interface PathNode {
 export interface PathResult {
 	path: PathNode[];
 	totalResistance: number;
+	bumpId?: string;
+	bumpLabel?: string;
 }
 
 // IR Drop types
