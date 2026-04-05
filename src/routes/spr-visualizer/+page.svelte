@@ -4,11 +4,15 @@ import PDNGrid3D from '$lib/three/PDNGrid3D.svelte';
 import {
 generateGrid,
 dijkstraToAllBumps,
+getEdgeResistance,
 DEFAULT_CONFIG
 } from '$lib/engine';
 import type { Grid, Instance, Domain, PathResult } from '$lib/engine';
 
 const PATH_COLORS_HEX = ['#FF6B6B', '#4f8ff7', '#22c55e', '#fbbf24', '#a78bfa', '#f472b6', '#22d3ee', '#fb923c'];
+const LAYER_HORIZ = [true, false, true, false];
+const LAYER_CSS = ['#e85d3a', '#3dc4c4', '#d4a017', '#7b68ee'];
+const LAYER_SHORT = ['M1', 'M2', 'M3', 'M4'];
 
 let grid = $state(generateGrid({ ...DEFAULT_CONFIG, seed: 42 }));
 let selectedSource = $state<Instance | null>(null);
@@ -19,6 +23,57 @@ let animating = $state(false);
 let showHelp = $state(false);
 let followMode = $state(false);
 let followingPath = $state<{idx: number; label: string; r: number} | null>(null);
+let breakdownIdx = $state<number | null>(null);
+
+interface Segment {
+layer: string;
+layerColor: string;
+dir: string;
+from: string;
+to: string;
+resistance: number;
+cumulative: number;
+}
+
+function computeBreakdown(pathIdx: number): Segment[] {
+const p = paths[pathIdx];
+if (!p) return [];
+const segs: Segment[] = [];
+let cumR = 0;
+let currentLayer = 0;
+
+for (let i = 1; i < p.path.length; i++) {
+const prev = p.path[i - 1];
+const curr = p.path[i];
+const isHoriz = curr.row === prev.row;
+
+// Track layer (upward only, matching pathTo3D logic)
+if (isHoriz !== LAYER_HORIZ[currentLayer]) {
+for (let L = currentLayer + 1; L < 4; L++) {
+if (LAYER_HORIZ[L] === isHoriz) { currentLayer = L; break; }
+}
+}
+
+const res = getEdgeResistance(grid, prev.row, prev.col, curr.row, curr.col);
+if (res === null) continue;
+cumR += res;
+
+segs.push({
+layer: LAYER_SHORT[currentLayer],
+layerColor: LAYER_CSS[currentLayer],
+dir: isHoriz ? '→' : '↓',
+from: `(${prev.row},${prev.col})`,
+to: `(${curr.row},${curr.col})`,
+resistance: res,
+cumulative: cumR
+});
+}
+return segs;
+}
+
+function toggleBreakdown(pathIdx: number) {
+breakdownIdx = breakdownIdx === pathIdx ? null : pathIdx;
+}
 
 // Narration
 type Phase = 'idle' | 'intro' | 'racing' | 'done';
@@ -104,6 +159,7 @@ phase = 'done';
 
 function handlePathClick(idx: number, label: string, r: number) {
 followingPath = { idx, label, r };
+breakdownIdx = idx;
 }
 
 function reset() {
@@ -111,6 +167,7 @@ selectedSource = null; selectedTarget = null;
 paths = []; animating = false;
 phase = 'idle'; donePaths = []; doneCount = 0;
 followingPath = null;
+breakdownIdx = null;
 }
 
 function newGrid() {
@@ -338,7 +395,9 @@ to each of <strong>{totalBumps} bumps</strong> simultaneously.
 {#if donePaths.length > 1}
 <div class="narr-comparison">
 {#each donePaths as dp, i}
-<div class="narr-row" class:narr-winner={i === 0}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="narr-row narr-row-click" class:narr-winner={i === 0} class:narr-row-active={breakdownIdx === dp.idx}
+onclick={() => toggleBreakdown(dp.idx)} onkeydown={() => {}}>
 <span class="narr-rank">{i + 1}.</span>
 <span class="narr-dot" style="background:{PATH_COLORS_HEX[dp.idx % PATH_COLORS_HEX.length]}"></span>
 <span class="narr-label">{dp.label}</span>
@@ -354,6 +413,50 @@ to each of <strong>{totalBumps} bumps</strong> simultaneously.
 <div class="narr-text dim">
 {((1 - donePaths[0].r / donePaths[donePaths.length - 1].r) * 100).toFixed(1)}%
 less resistance than worst path.
+</div>
+<div class="narr-text dim" style="margin-top:0.3rem">Click any path row to see resistance breakdown</div>
+{/if}
+
+<!-- Resistance Breakdown Panel -->
+{#if breakdownIdx !== null}
+{@const segs = computeBreakdown(breakdownIdx)}
+{@const totalR = paths[breakdownIdx]?.totalResistance ?? 1}
+{@const bLabel = paths[breakdownIdx]?.bumpLabel ?? ''}
+<div class="breakdown-panel">
+<div class="breakdown-header">
+<span class="breakdown-title">🔬 Breakdown: {bLabel}</span>
+<button class="breakdown-close" onclick={() => (breakdownIdx = null)}>✕</button>
+</div>
+<div class="breakdown-bar">
+{#each segs as seg}
+<div class="breakdown-bar-seg"
+style="width:{(seg.resistance / totalR) * 100}%;background:{seg.layerColor}"
+title="{seg.layer}: {seg.resistance.toFixed(3)}Ω ({((seg.resistance/totalR)*100).toFixed(0)}%)">
+</div>
+{/each}
+</div>
+<div class="breakdown-legend-row">
+{#each ['M1','M2','M3','M4'] as lbl, li}
+<span class="breakdown-legend-chip">
+<span class="bd-chip-dot" style="background:{LAYER_CSS[li]}"></span>{lbl}
+</span>
+{/each}
+</div>
+<div class="breakdown-table">
+{#each segs as seg, i}
+<div class="bd-row">
+<span class="bd-num">{i+1}</span>
+<span class="bd-chip" style="background:{seg.layerColor}">{seg.layer}</span>
+<span class="bd-dir">{seg.dir}</span>
+<span class="bd-coords">{seg.from}{seg.dir}{seg.to}</span>
+<span class="bd-r">{seg.resistance.toFixed(3)}</span>
+<span class="bd-cum">Σ {seg.cumulative.toFixed(3)}</span>
+</div>
+{/each}
+</div>
+<div class="breakdown-total">
+Total: <strong>{totalR.toFixed(4)} Ω</strong> across {segs.length} segments
+</div>
 </div>
 {/if}
 {/if}
@@ -447,6 +550,66 @@ border-radius: 6px; font-size: 0.76rem; color: var(--color-accent-blue);
 animation: fadeIn 0.3s ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Clickable path rows */
+.narr-row-click { cursor: pointer; transition: background 0.15s; }
+.narr-row-click:hover { background: rgba(79, 143, 247, 0.08); }
+.narr-row-active { background: rgba(79, 143, 247, 0.12); border-left: 2px solid var(--color-accent-blue); }
+
+/* Resistance Breakdown Panel */
+.breakdown-panel {
+margin-top: 0.6rem; padding: 0.6rem;
+background: rgba(6, 10, 20, 0.6); border: 1px solid rgba(79, 143, 247, 0.2);
+border-radius: 8px; animation: fadeIn 0.25s ease;
+}
+.breakdown-header {
+display: flex; justify-content: space-between; align-items: center;
+margin-bottom: 0.4rem;
+}
+.breakdown-title { font-size: 0.78rem; font-weight: 700; color: var(--color-text-primary); }
+.breakdown-close {
+background: none; border: none; color: var(--color-text-muted);
+font-size: 0.85rem; cursor: pointer; padding: 0 0.2rem;
+}
+.breakdown-close:hover { color: var(--color-text-primary); }
+.breakdown-bar {
+display: flex; height: 10px; border-radius: 5px; overflow: hidden;
+margin-bottom: 0.35rem; background: rgba(255,255,255,0.05);
+}
+.breakdown-bar-seg {
+min-width: 2px; transition: width 0.3s ease;
+}
+.breakdown-bar-seg:first-child { border-radius: 5px 0 0 5px; }
+.breakdown-bar-seg:last-child { border-radius: 0 5px 5px 0; }
+.breakdown-legend-row {
+display: flex; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap;
+}
+.breakdown-legend-chip {
+display: flex; align-items: center; gap: 0.2rem;
+font-size: 0.65rem; color: var(--color-text-muted);
+}
+.bd-chip-dot { width: 6px; height: 6px; border-radius: 2px; }
+.breakdown-table {
+max-height: 160px; overflow-y: auto;
+}
+.bd-row {
+display: flex; align-items: center; gap: 0.25rem;
+padding: 0.15rem 0; font-size: 0.68rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.bd-num { color: var(--color-text-muted); width: 1.2em; text-align: right; flex-shrink: 0; }
+.bd-chip {
+font-size: 0.6rem; font-weight: 700; color: #000;
+padding: 0.05rem 0.3rem; border-radius: 3px; flex-shrink: 0;
+}
+.bd-dir { color: var(--color-text-muted); flex-shrink: 0; }
+.bd-coords { color: var(--color-text-secondary); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bd-r { font-family: 'JetBrains Mono', monospace; color: var(--color-text-primary); font-size: 0.67rem; flex-shrink: 0; }
+.bd-cum { font-family: 'JetBrains Mono', monospace; color: var(--color-text-muted); font-size: 0.63rem; flex-shrink: 0; }
+.breakdown-total {
+margin-top: 0.35rem; padding-top: 0.3rem;
+border-top: 1px solid rgba(255,255,255,0.08);
+font-size: 0.72rem; color: var(--color-text-secondary);
+}
 
 /* Narration */
 .narration {
