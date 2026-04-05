@@ -55,7 +55,7 @@
 		border-radius: 0 6px 6px 0;
 		color: var(--color-text-secondary);
 		cursor: pointer;
-		font-size: 14px;
+		font-size: 16px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
