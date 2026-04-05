@@ -17,11 +17,11 @@ export interface GridConfig {
 }
 
 export const DEFAULT_CONFIG: GridConfig = {
-	rows: 10,
-	cols: 10,
-	numDomains: 3,
-	bumpsPerDomain: [2, 6],
-	numInstances: 7,
+	rows: 12,
+	cols: 12,
+	numDomains: 4,
+	bumpsPerDomain: [4, 8],
+	numInstances: 12,
 	resistanceRange: {
 		edge: [0.05, 0.2],
 		bump: [0.01, 0.05],
