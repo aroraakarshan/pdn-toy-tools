@@ -757,7 +757,7 @@ pathGroup.traverse((obj: any) => {
 if (!obj.isMesh || !obj.material) return;
 const mat = obj.material as any;
 const tIdx = obj.userData?.trackIdx;
-if (tIdx === trackIdx && !obj.userData?.isWinner) {
+if (tIdx === trackIdx) {
 mat.opacity = 1.0;
 mat.emissiveIntensity = 0.7;
 } else if (tIdx !== undefined || obj.userData?.isWinner) {
