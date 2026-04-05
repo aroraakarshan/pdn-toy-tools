@@ -17,6 +17,8 @@ let paths = $state<PathResult[]>([]);
 let animSpeed = $state(1.0);
 let animating = $state(false);
 let showHelp = $state(false);
+let followMode = $state(false);
+let followingPath = $state<{idx: number; label: string; r: number} | null>(null);
 
 // Narration
 type Phase = 'idle' | 'intro' | 'racing' | 'done';
@@ -100,10 +102,15 @@ animating = false;
 phase = 'done';
 }
 
+function handlePathClick(idx: number, label: string, r: number) {
+followingPath = { idx, label, r };
+}
+
 function reset() {
 selectedSource = null; selectedTarget = null;
 paths = []; animating = false;
 phase = 'idle'; donePaths = []; doneCount = 0;
+followingPath = null;
 }
 
 function newGrid() {
@@ -211,6 +218,24 @@ disabled={!selectedSource || animating}>
 </div>
 <div class="button-sep"></div>
 
+<div class="control-group switch-group">
+<label class="switch-row">
+<span class="switch-text">🎥 Follow Path Camera</span>
+<label class="switch">
+<input type="checkbox" bind:checked={followMode} />
+<span class="switch-slider"></span>
+</label>
+</label>
+{#if followMode}
+<div class="switch-hint">Click any colored path tube to fly along it</div>
+{/if}
+{#if followingPath}
+<div class="follow-badge">
+Following: <strong>{followingPath.label}</strong> — {followingPath.r.toFixed(3)}Ω
+</div>
+{/if}
+</div>
+
 <!-- ── NARRATION ── -->
 {#if phase === 'idle'}
 <div class="narration">
@@ -253,10 +278,12 @@ Select an instance, pick a domain with bumps, then click
 {selectedTarget}
 {paths}
 {animSpeed}
+{followMode}
 onInstanceClick={handleInstanceClick}
 onDomainClick={handleDomainClick}
 onAnimationDone={handleAnimDone}
 onAnimationStep={handleAnimStep}
+onPathClick={handlePathClick}
 />
 
 {#if phase !== 'idle'}
@@ -380,6 +407,46 @@ transition: all 0.15s ease; white-space: nowrap;
 .btn-ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
 .btn-ghost:hover { background: var(--color-bg-tertiary); }
 	.button-sep { height: 1px; background: var(--color-border); margin: 0.25rem 0 0.5rem; }
+
+/* Follow mode toggle */
+.switch-group { margin-top: 0.25rem; }
+.switch-row {
+display: flex; justify-content: space-between; align-items: center;
+padding: 0.3rem 0; cursor: pointer;
+}
+.switch-text { font-size: 0.78rem; font-weight: 600; color: var(--color-text-secondary); }
+.switch {
+position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-slider {
+position: absolute; inset: 0; border-radius: 22px;
+background: var(--color-bg-tertiary); border: 1px solid var(--color-border);
+transition: all 0.25s ease; cursor: pointer;
+}
+.switch-slider::before {
+content: ''; position: absolute; left: 2px; bottom: 2px;
+width: 16px; height: 16px; border-radius: 50%;
+background: var(--color-text-muted);
+transition: transform 0.25s ease, background 0.25s ease;
+}
+.switch input:checked + .switch-slider {
+background: rgba(79, 143, 247, 0.2); border-color: var(--color-accent-blue);
+}
+.switch input:checked + .switch-slider::before {
+transform: translateX(18px); background: var(--color-accent-blue);
+}
+.switch-hint {
+font-size: 0.7rem; color: var(--color-text-muted); font-style: italic;
+margin-top: 0.15rem;
+}
+.follow-badge {
+margin-top: 0.35rem; padding: 0.4rem 0.6rem;
+background: rgba(79, 143, 247, 0.1); border: 1px solid rgba(79, 143, 247, 0.25);
+border-radius: 6px; font-size: 0.76rem; color: var(--color-accent-blue);
+animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* Narration */
 .narration {

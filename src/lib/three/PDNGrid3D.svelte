@@ -9,20 +9,24 @@ selectedSource = null,
 selectedTarget = null,
 paths = [],
 animSpeed = 1.0,
+followMode = false,
 onInstanceClick,
 onDomainClick,
 onAnimationDone,
-onAnimationStep
+onAnimationStep,
+onPathClick
 }: {
 grid: Grid;
 selectedSource?: Instance | null;
 selectedTarget?: Domain | null;
 paths?: PathResult[];
 animSpeed?: number;
+followMode?: boolean;
 onInstanceClick?: (inst: Instance) => void;
 onDomainClick?: (domain: Domain) => void;
 onAnimationDone?: () => void;
 onAnimationStep?: (step: { phase: string; pathIdx: number; totalPaths: number; segmentR?: number; runningTotal: number; finalR?: number }) => void;
+onPathClick?: (pathIdx: number, bumpLabel: string, resistance: number) => void;
 } = $props();
 
 let container: HTMLDivElement;
@@ -34,6 +38,7 @@ updateSelection: () => void;
 animatePaths: (p: PathResult[]) => void;
 clearPaths: () => void;
 setSpeed: (s: number) => void;
+followPath: (idx: number) => void;
 } | null = null;
 
 let cleanup: (() => void) | null = null;
@@ -465,14 +470,21 @@ let animActive = false;
 let localAnimSpeed = 1.0;
 let winnerDone = false;
 let flowParticles: { mesh: any; pts: InstanceType<typeof THREE.Vector3>[]; phase: number; speed: number }[] = [];
+let pathTubes: any[] = [];
+let followTrackIdx = -1;
+let followProgress = 0;
+let followActive = false;
 
 function clearPathGroup() {
 pathGroup.clear();
 labelGroup.clear();
 tracks = [];
 flowParticles = [];
+pathTubes = [];
 animActive = false;
 winnerDone = false;
+followTrackIdx = -1;
+followActive = false;
 }
 
 function startAnimation(allPaths: PathResult[]) {
@@ -559,7 +571,7 @@ const curvePath = new (THREE.CurvePath as any)();
 for (let i = 0; i < pts.length - 1; i++) {
 curvePath.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
 }
-const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 6, 0.07, 10, false);
+const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 6, 0.09, 10, false);
 const tubeMat = new THREE.MeshStandardMaterial({
 color, emissive: color, emissiveIntensity: 0.4,
 transparent: true, opacity: 0.85, roughness: 0.3, metalness: 0.6
@@ -567,6 +579,7 @@ transparent: true, opacity: 0.85, roughness: 0.3, metalness: 0.6
 const tube = new THREE.Mesh(tubeGeo, tubeMat);
 tube.userData = { trackIdx: track.idx };
 pathGroup.add(tube);
+pathTubes.push(tube);
 
 // Label at the end (bump)
 const endPt = pts[pts.length - 1];
@@ -664,8 +677,8 @@ if (tracks[i].totalR < tracks[winIdx].totalR) winIdx = i;
 pathGroup.traverse((obj: any) => {
 if (obj.userData?.trackIdx !== undefined) {
 const mat = obj.material as any;
-mat.opacity = 0.55;
-mat.emissiveIntensity = 0.25;
+mat.opacity = 0.70;
+mat.emissiveIntensity = 0.35;
 }
 });
 
@@ -682,7 +695,9 @@ color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 0.9,
 transparent: true, opacity: 1.0, roughness: 0.2, metalness: 0.8
 });
 const winTube = new THREE.Mesh(winTubeGeo, winTubeMat);
+winTube.userData = { isWinner: true, trackIdx: winIdx };
 pathGroup.add(winTube);
+pathTubes.push(winTube);
 
 // Add bright flowing particles on the winner
 for (let p = 0; p < 5; p++) {
@@ -742,6 +757,96 @@ c.z + (n.z - c.z) * sp
 }
 }
 
+// ── Follow path camera ──
+function startFollowPath(trackIdx: number) {
+const track = tracks[trackIdx];
+if (!track || track.pts.length < 2) return;
+
+followTrackIdx = trackIdx;
+followProgress = 0;
+followActive = true;
+
+// Highlight followed path, dim everything else
+pathGroup.traverse((obj: any) => {
+if (!obj.isMesh || !obj.material) return;
+const mat = obj.material as any;
+const tIdx = obj.userData?.trackIdx;
+if (tIdx === trackIdx && !obj.userData?.isWinner) {
+mat.opacity = 1.0;
+mat.emissiveIntensity = 0.7;
+} else if (tIdx !== undefined || obj.userData?.isWinner) {
+mat.opacity = 0.12;
+mat.emissiveIntensity = 0.04;
+}
+});
+
+onPathClick?.(trackIdx, track.bumpLabel, track.totalR);
+}
+
+function tickFollowCamera() {
+if (!followActive || !followMode || followTrackIdx < 0) return;
+const pts = tracks[followTrackIdx]?.pts;
+if (!pts || pts.length < 2) { followActive = false; return; }
+
+followProgress += 0.004 * localAnimSpeed;
+
+if (followProgress >= 1) {
+followActive = false;
+followTrackIdx = -1;
+if (winnerDone) restoreWinnerHighlight();
+const overviewPos = new THREE.Vector3(cx + 10, midY + 10, cz + 16);
+const overviewLook = new THREE.Vector3(cx, midY, cz);
+smoothCameraTo(overviewPos, overviewLook);
+return;
+}
+
+const totalSegs = pts.length - 1;
+const pos = followProgress * totalSegs;
+const si = Math.min(Math.floor(pos), totalSegs - 1);
+const frac = pos - si;
+const current = pts[si];
+const next = pts[Math.min(si + 1, totalSegs)];
+
+const pathPos = new THREE.Vector3(
+current.x + (next.x - current.x) * frac,
+current.y + (next.y - current.y) * frac,
+current.z + (next.z - current.z) * frac
+);
+
+// Third-person camera offset (slightly right, above, behind)
+const camPos = pathPos.clone().add(new THREE.Vector3(5, 3, 4));
+
+// Look ahead along path
+const la = Math.min(followProgress + 0.08, 1) * totalSegs;
+const lai = Math.min(Math.floor(la), totalSegs - 1);
+const laf = la - lai;
+const lookC = pts[lai];
+const lookN = pts[Math.min(lai + 1, totalSegs)];
+const lookTarget = new THREE.Vector3(
+lookC.x + (lookN.x - lookC.x) * laf,
+lookC.y + (lookN.y - lookC.y) * laf,
+lookC.z + (lookN.z - lookC.z) * laf
+);
+
+camera.position.lerp(camPos, 0.06);
+controls.target.lerp(lookTarget, 0.06);
+controls.update();
+}
+
+function restoreWinnerHighlight() {
+pathGroup.traverse((obj: any) => {
+if (!obj.isMesh || !obj.material) return;
+const mat = obj.material as any;
+if (obj.userData?.isWinner) {
+mat.opacity = 1.0;
+mat.emissiveIntensity = 0.9;
+} else if (obj.userData?.trackIdx !== undefined) {
+mat.opacity = 0.70;
+mat.emissiveIntensity = 0.35;
+}
+});
+}
+
 // ── Click detection ──
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -753,6 +858,19 @@ const r2 = renderer.domElement.getBoundingClientRect();
 mouse.x = ((e.clientX - r2.left) / r2.width) * 2 - 1;
 mouse.y = -((e.clientY - r2.top) / r2.height) * 2 + 1;
 raycaster.setFromCamera(mouse, camera);
+
+// Check path tubes first when follow mode is on
+if (followMode && pathTubes.length > 0 && !animActive) {
+const pathHits = raycaster.intersectObjects(pathTubes);
+if (pathHits.length) {
+const tIdx = pathHits[0].object.userData?.trackIdx;
+if (tIdx !== undefined) {
+startFollowPath(tIdx);
+return;
+}
+}
+}
+
 const hits = raycaster.intersectObjects(clickables);
 if (!hits.length) return;
 const d = hits[0].object.userData;
@@ -782,7 +900,19 @@ requestAnimationFrame(loop);
 const now = performance.now();
 const dt = now - lastTime;
 lastTime = now;
+
+// Cancel follow if followMode toggled off
+if (!followMode && followActive) {
+followActive = false;
+followTrackIdx = -1;
+if (winnerDone) restoreWinnerHighlight();
+}
+
+if (followActive) {
+tickFollowCamera();
+} else {
 tickCamera();
+}
 controls.update();
 tickAnimation(dt);
 tickFlowParticles();
@@ -798,7 +928,8 @@ rebuild: () => { buildGrid(); updateSelection(); },
 updateSelection,
 animatePaths: startAnimation,
 clearPaths: clearPathGroup,
-setSpeed: (s: number) => { localAnimSpeed = s; }
+setSpeed: (s: number) => { localAnimSpeed = s; },
+followPath: startFollowPath
 };
 sceneReady = true;
 
