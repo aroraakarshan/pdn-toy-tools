@@ -469,7 +469,6 @@ let tracks: ParallelTrack[] = [];
 let animActive = false;
 let localAnimSpeed = 1.0;
 let winnerDone = false;
-let flowParticles: { mesh: any; pts: InstanceType<typeof THREE.Vector3>[]; phase: number; speed: number }[] = [];
 let pathTubes: any[] = [];
 let followTrackIdx = -1;
 let followProgress = 0;
@@ -479,7 +478,6 @@ function clearPathGroup() {
 pathGroup.clear();
 labelGroup.clear();
 tracks = [];
-flowParticles = [];
 pathTubes = [];
 animActive = false;
 winnerDone = false;
@@ -590,15 +588,6 @@ cssColor, 0.65
 rLabel.position.set(endPt.x, endPt.y + 0.3 + track.idx * 0.25, endPt.z);
 labelGroup.add(rLabel);
 
-// Flowing particles
-for (let p = 0; p < 2; p++) {
-const fpMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
-const fp = new THREE.Mesh(particleGeo, fpMat);
-fp.scale.setScalar(0.35);
-pathGroup.add(fp);
-flowParticles.push({ mesh: fp, pts, phase: p / 2, speed: 0.0004 + Math.random() * 0.0002 });
-}
-
 onAnimationStep?.({
 phase: 'pathDone',
 pathIdx: track.idx,
@@ -699,17 +688,6 @@ winTube.userData = { isWinner: true, trackIdx: winIdx };
 pathGroup.add(winTube);
 pathTubes.push(winTube);
 
-// Add bright flowing particles on the winner
-for (let p = 0; p < 5; p++) {
-const fpMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const fp = new THREE.Mesh(particleGeo, fpMat);
-fp.scale.setScalar(0.7);
-const fpLight = new THREE.PointLight(0xffd700, 0.6, 3.0);
-fp.add(fpLight);
-pathGroup.add(fp);
-flowParticles.push({ mesh: fp, pts: winPts, phase: p / 5, speed: 0.0005 });
-}
-
 // Camera zooms toward winner
 const mid = winPts[Math.floor(winPts.length / 2)];
 const winCamPos = new THREE.Vector3(mid.x + 6, mid.y + 5, mid.z + 8);
@@ -739,25 +717,10 @@ startLabel.position.set(winStart.x, winStart.y - 0.3, winStart.z);
 labelGroup.add(startLabel);
 }
 
-function tickFlowParticles() {
-for (const fp of flowParticles) {
-const pts = fp.pts;
-if (!pts || pts.length < 2) continue;
-fp.phase = (fp.phase + fp.speed * localAnimSpeed) % 1;
-const totalSegs = pts.length - 1;
-const pos = fp.phase * totalSegs;
-const si = Math.min(Math.floor(pos), totalSegs - 1);
-const sp = pos - si;
-const c = pts[si], n = pts[si + 1];
-fp.mesh.position.set(
-c.x + (n.x - c.x) * sp,
-c.y + (n.y - c.y) * sp,
-c.z + (n.z - c.z) * sp
-);
-}
-}
-
 // ── Follow path camera ──
+let followCurve: any = null;
+let followLookCurve: any = null;
+
 function startFollowPath(trackIdx: number) {
 const track = tracks[trackIdx];
 if (!track || track.pts.length < 2) return;
@@ -765,6 +728,15 @@ if (!track || track.pts.length < 2) return;
 followTrackIdx = trackIdx;
 followProgress = 0;
 followActive = true;
+
+// Build smooth spline curves for camera position and look-at target
+const camPts = track.pts.map(p =>
+new THREE.Vector3(p.x + 5, p.y + 3, p.z + 4)
+);
+followCurve = new THREE.CatmullRomCurve3(camPts, false, 'catmullrom', 0.3);
+followLookCurve = new THREE.CatmullRomCurve3(
+track.pts.map(p => p.clone()), false, 'catmullrom', 0.3
+);
 
 // Highlight followed path, dim everything else
 pathGroup.traverse((obj: any) => {
@@ -785,14 +757,15 @@ onPathClick?.(trackIdx, track.bumpLabel, track.totalR);
 
 function tickFollowCamera() {
 if (!followActive || !followMode || followTrackIdx < 0) return;
-const pts = tracks[followTrackIdx]?.pts;
-if (!pts || pts.length < 2) { followActive = false; return; }
+if (!followCurve || !followLookCurve) { followActive = false; return; }
 
-followProgress += 0.004 * localAnimSpeed;
+followProgress += 0.003 * localAnimSpeed;
 
 if (followProgress >= 1) {
 followActive = false;
 followTrackIdx = -1;
+followCurve = null;
+followLookCurve = null;
 if (winnerDone) restoreWinnerHighlight();
 const overviewPos = new THREE.Vector3(cx + 10, midY + 10, cz + 16);
 const overviewLook = new THREE.Vector3(cx, midY, cz);
@@ -800,36 +773,12 @@ smoothCameraTo(overviewPos, overviewLook);
 return;
 }
 
-const totalSegs = pts.length - 1;
-const pos = followProgress * totalSegs;
-const si = Math.min(Math.floor(pos), totalSegs - 1);
-const frac = pos - si;
-const current = pts[si];
-const next = pts[Math.min(si + 1, totalSegs)];
+// Smooth spline-based camera position and look-at
+const camPos = followCurve.getPointAt(followProgress);
+const lookAt = followLookCurve.getPointAt(Math.min(followProgress + 0.06, 1));
 
-const pathPos = new THREE.Vector3(
-current.x + (next.x - current.x) * frac,
-current.y + (next.y - current.y) * frac,
-current.z + (next.z - current.z) * frac
-);
-
-// Third-person camera offset (slightly right, above, behind)
-const camPos = pathPos.clone().add(new THREE.Vector3(5, 3, 4));
-
-// Look ahead along path
-const la = Math.min(followProgress + 0.08, 1) * totalSegs;
-const lai = Math.min(Math.floor(la), totalSegs - 1);
-const laf = la - lai;
-const lookC = pts[lai];
-const lookN = pts[Math.min(lai + 1, totalSegs)];
-const lookTarget = new THREE.Vector3(
-lookC.x + (lookN.x - lookC.x) * laf,
-lookC.y + (lookN.y - lookC.y) * laf,
-lookC.z + (lookN.z - lookC.z) * laf
-);
-
-camera.position.lerp(camPos, 0.06);
-controls.target.lerp(lookTarget, 0.06);
+camera.position.copy(camPos);
+controls.target.copy(lookAt);
 controls.update();
 }
 
@@ -905,6 +854,8 @@ lastTime = now;
 if (!followMode && followActive) {
 followActive = false;
 followTrackIdx = -1;
+followCurve = null;
+followLookCurve = null;
 if (winnerDone) restoreWinnerHighlight();
 }
 
@@ -912,10 +863,9 @@ if (followActive) {
 tickFollowCamera();
 } else {
 tickCamera();
-}
 controls.update();
+}
 tickAnimation(dt);
-tickFlowParticles();
 renderer.render(scene, camera);
 }
 

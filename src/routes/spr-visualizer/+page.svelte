@@ -227,7 +227,7 @@ disabled={!selectedSource || animating}>
 </label>
 </label>
 {#if followMode}
-<div class="switch-hint">Click any colored path tube to fly along it</div>
+<div class="switch-hint">After animation completes, click any path tube to fly along it</div>
 {/if}
 {#if followingPath}
 <div class="follow-badge">
