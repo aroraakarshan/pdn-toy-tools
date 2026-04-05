@@ -1,5 +1,5 @@
 import type { Grid, Domain, Instance, Bump, PathNode, IRDropResult } from '../engine/types';
-import { findBumpAt, findInstanceAt } from '../engine/grid';
+import { findBumpAt, findInstanceAt, getEdgeResistance } from '../engine/grid';
 
 export interface GridRenderOptions {
 	padding: number;
@@ -14,10 +14,10 @@ export interface GridRenderOptions {
 }
 
 const DEFAULTS: GridRenderOptions = {
-	padding: 48,
-	nodeRadius: 4,
-	bumpRadius: 10,
-	instanceSize: 14,
+	padding: 56,
+	nodeRadius: 5,
+	bumpRadius: 14,
+	instanceSize: 20,
 	edgeWidth: 1.5,
 	showResistanceLabels: false
 };
@@ -82,22 +82,23 @@ export function renderGrid(
 
 	ctx.clearRect(0, 0, width, height);
 
-	// Background
-	ctx.fillStyle = '#141722';
+	// Background with subtle gradient
+	const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+	bgGrad.addColorStop(0, '#0f1420');
+	bgGrad.addColorStop(1, '#141a2a');
+	ctx.fillStyle = bgGrad;
 	ctx.fillRect(0, 0, width, height);
 
-	// Draw edges
+	// Draw edges with resistance-proportional styling
 	for (let r = 0; r < rows; r++) {
 		for (let c = 0; c < cols; c++) {
 			const from = gridToCanvas(r, c, width, height, grid, o.padding);
 			const res = grid.resistances[r][c];
 
-			// Right edge
 			if (res.right !== null && c < cols - 1) {
 				const to = gridToCanvas(r, c + 1, width, height, grid, o.padding);
 				drawEdge(ctx, from, to, res.right, o);
 			}
-			// Down edge
 			if (res.down !== null && r < rows - 1) {
 				const to = gridToCanvas(r + 1, c, width, height, grid, o.padding);
 				drawEdge(ctx, from, to, res.down, o);
@@ -108,7 +109,6 @@ export function renderGrid(
 	// Draw grid nodes
 	for (let r = 0; r < rows; r++) {
 		for (let c = 0; c < cols; c++) {
-			// Skip if bump or instance (drawn separately)
 			if (findBumpAt(grid, r, c) || findInstanceAt(grid, r, c)) continue;
 
 			const pos = gridToCanvas(r, c, width, height, grid, o.padding);
@@ -116,9 +116,17 @@ export function renderGrid(
 				o.highlightedNode && o.highlightedNode.row === r && o.highlightedNode.col === c;
 
 			ctx.beginPath();
-			ctx.arc(pos.x, pos.y, isHighlighted ? o.nodeRadius + 2 : o.nodeRadius, 0, Math.PI * 2);
-			ctx.fillStyle = isHighlighted ? '#6b7294' : '#4a5280';
+			ctx.arc(pos.x, pos.y, isHighlighted ? o.nodeRadius + 3 : o.nodeRadius, 0, Math.PI * 2);
+			ctx.fillStyle = isHighlighted ? '#8b94b8' : '#4a5280';
 			ctx.fill();
+
+			if (isHighlighted) {
+				ctx.beginPath();
+				ctx.arc(pos.x, pos.y, o.nodeRadius + 8, 0, Math.PI * 2);
+				ctx.strokeStyle = '#4f8ff740';
+				ctx.lineWidth = 1;
+				ctx.stroke();
+			}
 		}
 	}
 
@@ -131,22 +139,27 @@ export function renderGrid(
 			// Glow for selected target domain
 			if (isSelectedTarget) {
 				ctx.beginPath();
-				ctx.arc(pos.x, pos.y, o.bumpRadius + 6, 0, Math.PI * 2);
-				ctx.fillStyle = domain.color + '30';
+				ctx.arc(pos.x, pos.y, o.bumpRadius + 10, 0, Math.PI * 2);
+				ctx.fillStyle = domain.color + '25';
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(pos.x, pos.y, o.bumpRadius + 5, 0, Math.PI * 2);
+				ctx.fillStyle = domain.color + '40';
 				ctx.fill();
 			}
 
+			// Bump circle
 			ctx.beginPath();
 			ctx.arc(pos.x, pos.y, o.bumpRadius, 0, Math.PI * 2);
 			ctx.fillStyle = domain.color;
 			ctx.fill();
-			ctx.strokeStyle = '#ffffff40';
-			ctx.lineWidth = 1.5;
+			ctx.strokeStyle = isSelectedTarget ? '#fff' : '#ffffff50';
+			ctx.lineWidth = isSelectedTarget ? 2.5 : 1.5;
 			ctx.stroke();
 
 			// Label
 			ctx.fillStyle = '#fff';
-			ctx.font = '600 9px Inter, sans-serif';
+			ctx.font = `700 ${Math.max(9, o.bumpRadius - 3)}px Inter, sans-serif`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
 			ctx.fillText('B', pos.x, pos.y);
@@ -159,30 +172,79 @@ export function renderGrid(
 		const isSource = o.selectedSource?.id === inst.id;
 		const half = o.instanceSize / 2;
 
-		// Glow for selected source
 		if (isSource) {
+			// Green star glow for selected source
 			ctx.beginPath();
-			ctx.rect(pos.x - half - 4, pos.y - half - 4, o.instanceSize + 8, o.instanceSize + 8);
-			ctx.fillStyle = '#fbbf2430';
+			ctx.arc(pos.x, pos.y, half + 10, 0, Math.PI * 2);
+			ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
 			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, half + 5, 0, Math.PI * 2);
+			ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
+			ctx.fill();
+
+			// Draw star shape for source
+			drawStar(ctx, pos.x, pos.y, 5, half + 2, half / 2 + 2);
+			ctx.fillStyle = '#22c55e';
+			ctx.fill();
+			ctx.strokeStyle = '#15803d';
+			ctx.lineWidth = 2;
+			ctx.stroke();
+		} else {
+			// Regular instance: purple square
+			ctx.beginPath();
+			ctx.rect(pos.x - half, pos.y - half, o.instanceSize, o.instanceSize);
+			ctx.fillStyle = '#9B59B6';
+			ctx.fill();
+			ctx.strokeStyle = '#663399';
+			ctx.lineWidth = 2;
+			ctx.stroke();
 		}
 
-		ctx.beginPath();
-		ctx.rect(pos.x - half, pos.y - half, o.instanceSize, o.instanceSize);
-		ctx.fillStyle = isSource ? '#fbbf24' : '#22d3ee';
-		ctx.fill();
-		ctx.strokeStyle = '#ffffff30';
-		ctx.lineWidth = 1;
-		ctx.stroke();
-
 		// Label
-		ctx.fillStyle = '#000';
-		ctx.font = '700 8px Inter, sans-serif';
+		ctx.fillStyle = '#fff';
+		ctx.font = `700 ${Math.max(9, half - 1)}px Inter, sans-serif`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 		const idx = inst.id.split('-')[1];
-		ctx.fillText(`I${idx}`, pos.x, pos.y);
+		ctx.fillText(idx, pos.x, pos.y);
 	}
+}
+
+/** Draw a star shape */
+function drawStar(
+	ctx: CanvasRenderingContext2D,
+	cx: number,
+	cy: number,
+	spikes: number,
+	outerR: number,
+	innerR: number
+) {
+	ctx.beginPath();
+	for (let i = 0; i < spikes * 2; i++) {
+		const angle = (i * Math.PI) / spikes - Math.PI / 2;
+		const r = i % 2 === 0 ? outerR : innerR;
+		const x = cx + Math.cos(angle) * r;
+		const y = cy + Math.sin(angle) * r;
+		if (i === 0) ctx.moveTo(x, y);
+		else ctx.lineTo(x, y);
+	}
+	ctx.closePath();
+}
+
+/** Draw a diamond shape */
+function drawDiamond(
+	ctx: CanvasRenderingContext2D,
+	cx: number,
+	cy: number,
+	size: number
+) {
+	ctx.beginPath();
+	ctx.moveTo(cx, cy - size);
+	ctx.lineTo(cx + size, cy);
+	ctx.lineTo(cx, cy + size);
+	ctx.lineTo(cx - size, cy);
+	ctx.closePath();
 }
 
 function drawEdge(
@@ -192,31 +254,189 @@ function drawEdge(
 	resistance: number,
 	opts: GridRenderOptions
 ) {
-	// Thicker edges = lower resistance (better connections)
 	const maxR = 0.2;
 	const minR = 0.05;
 	const t = 1 - Math.min(1, Math.max(0, (resistance - minR) / (maxR - minR)));
-	const lineWidth = 0.5 + t * 2.5;
+	const lineWidth = 0.8 + t * 2.5;
 
 	ctx.beginPath();
 	ctx.moveTo(from.x, from.y);
 	ctx.lineTo(to.x, to.y);
-	ctx.strokeStyle = `rgba(61, 68, 96, ${0.4 + t * 0.6})`;
+	ctx.strokeStyle = `rgba(80, 90, 130, ${0.35 + t * 0.5})`;
 	ctx.lineWidth = lineWidth;
 	ctx.stroke();
 
 	if (opts.showResistanceLabels) {
 		const mx = (from.x + to.x) / 2;
 		const my = (from.y + to.y) / 2;
-		ctx.fillStyle = '#6b7294';
+
+		// Background pill for readability
+		const text = `${resistance.toFixed(3)}Ω`;
 		ctx.font = '10px JetBrains Mono, monospace';
+		const tw = ctx.measureText(text).width;
+		ctx.fillStyle = 'rgba(15, 20, 32, 0.85)';
+		const isHoriz = Math.abs(from.y - to.y) < 1;
+		const ox = isHoriz ? 0 : 10;
+		const oy = isHoriz ? -10 : 0;
+		ctx.fillRect(mx + ox - tw / 2 - 2, my + oy - 6, tw + 4, 12);
+
+		ctx.fillStyle = '#8b94b8';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillText(`${resistance.toFixed(2)}Ω`, mx, my - 8);
+		ctx.fillText(text, mx + ox, my + oy);
 	}
 }
 
-/** Render a path with animated particle */
+/** Path rendering colors */
+export const PATH_COLORS = [
+	'#FF6B6B', '#4f8ff7', '#22c55e', '#fbbf24', '#a78bfa',
+	'#f472b6', '#22d3ee', '#fb923c', '#86efac', '#c4b5fd'
+];
+
+/** Render a progressively drawn path — only draws up to segmentIndex + fractional segmentProgress */
+export function renderProgressivePath(
+	ctx: CanvasRenderingContext2D,
+	grid: Grid,
+	path: PathNode[],
+	width: number,
+	height: number,
+	padding: number,
+	color: string,
+	segmentIndex: number,
+	segmentProgress: number,
+	particleSize: number = 8
+) {
+	if (path.length < 2) return;
+
+	// Draw completed path segments (with glow)
+	if (segmentIndex > 0 || segmentProgress > 0) {
+		ctx.save();
+		ctx.shadowColor = color;
+		ctx.shadowBlur = 12;
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 4;
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+		ctx.beginPath();
+
+		const start = gridToCanvas(path[0].row, path[0].col, width, height, grid, padding);
+		ctx.moveTo(start.x, start.y);
+
+		for (let i = 1; i <= segmentIndex && i < path.length; i++) {
+			const pt = gridToCanvas(path[i].row, path[i].col, width, height, grid, padding);
+			ctx.lineTo(pt.x, pt.y);
+		}
+
+		// Partial current segment
+		if (segmentProgress > 0 && segmentIndex < path.length - 1) {
+			const curr = gridToCanvas(path[segmentIndex].row, path[segmentIndex].col, width, height, grid, padding);
+			const next = gridToCanvas(path[segmentIndex + 1].row, path[segmentIndex + 1].col, width, height, grid, padding);
+			const px = curr.x + (next.x - curr.x) * segmentProgress;
+			const py = curr.y + (next.y - curr.y) * segmentProgress;
+			ctx.lineTo(px, py);
+		}
+
+		ctx.stroke();
+		ctx.restore();
+	}
+
+	// Draw moving particle at the frontier
+	const effectiveSegIdx = Math.min(segmentIndex, path.length - 2);
+	const p1 = gridToCanvas(path[effectiveSegIdx].row, path[effectiveSegIdx].col, width, height, grid, padding);
+	const p2 = gridToCanvas(path[Math.min(effectiveSegIdx + 1, path.length - 1)].row, path[Math.min(effectiveSegIdx + 1, path.length - 1)].col, width, height, grid, padding);
+
+	const px = p1.x + (p2.x - p1.x) * segmentProgress;
+	const py = p1.y + (p2.y - p1.y) * segmentProgress;
+
+	// Outer glow
+	ctx.beginPath();
+	ctx.arc(px, py, particleSize + 6, 0, Math.PI * 2);
+	ctx.fillStyle = color + '20';
+	ctx.fill();
+
+	// Inner particle
+	ctx.beginPath();
+	ctx.arc(px, py, particleSize, 0, Math.PI * 2);
+	ctx.fillStyle = '#FFD700';
+	ctx.fill();
+	ctx.strokeStyle = color;
+	ctx.lineWidth = 2.5;
+	ctx.stroke();
+}
+
+/** Render a fully completed path (no animation) */
+export function renderCompletePath(
+	ctx: CanvasRenderingContext2D,
+	grid: Grid,
+	path: PathNode[],
+	width: number,
+	height: number,
+	padding: number,
+	color: string,
+	lineWidth: number = 3.5
+) {
+	if (path.length < 2) return;
+
+	ctx.save();
+	ctx.shadowColor = color;
+	ctx.shadowBlur = 10;
+	ctx.strokeStyle = color;
+	ctx.lineWidth = lineWidth;
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
+	ctx.beginPath();
+
+	const start = gridToCanvas(path[0].row, path[0].col, width, height, grid, padding);
+	ctx.moveTo(start.x, start.y);
+
+	for (let i = 1; i < path.length; i++) {
+		const pt = gridToCanvas(path[i].row, path[i].col, width, height, grid, padding);
+		ctx.lineTo(pt.x, pt.y);
+	}
+
+	ctx.stroke();
+	ctx.restore();
+}
+
+/** Render flowing particles along a completed path */
+export function renderFlowingParticles(
+	ctx: CanvasRenderingContext2D,
+	grid: Grid,
+	path: PathNode[],
+	width: number,
+	height: number,
+	padding: number,
+	color: string,
+	time: number,
+	numParticles: number = 3
+) {
+	if (path.length < 2) return;
+
+	for (let p = 0; p < numParticles; p++) {
+		const phase = ((p / numParticles) + time * 0.0008) % 1;
+		const totalLen = path.length - 1;
+		const pos = phase * totalLen;
+		const segIdx = Math.min(Math.floor(pos), totalLen - 1);
+		const segProg = pos - segIdx;
+
+		const p1 = gridToCanvas(path[segIdx].row, path[segIdx].col, width, height, grid, padding);
+		const p2 = gridToCanvas(path[segIdx + 1].row, path[segIdx + 1].col, width, height, grid, padding);
+
+		const px = p1.x + (p2.x - p1.x) * segProg;
+		const py = p1.y + (p2.y - p1.y) * segProg;
+
+		// Particle with trail
+		ctx.beginPath();
+		ctx.arc(px, py, 5, 0, Math.PI * 2);
+		ctx.fillStyle = '#FFD700';
+		ctx.fill();
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 2;
+		ctx.stroke();
+	}
+}
+
+/** Render a path with simple animated particle (legacy) */
 export function renderPath(
 	ctx: CanvasRenderingContext2D,
 	grid: Grid,
@@ -225,11 +445,10 @@ export function renderPath(
 	height: number,
 	padding: number,
 	color: string,
-	particleProgress?: number // 0-1 along the path
+	particleProgress?: number
 ) {
 	if (path.length < 2) return;
 
-	// Draw path line
 	ctx.beginPath();
 	const start = gridToCanvas(path[0].row, path[0].col, width, height, grid, padding);
 	ctx.moveTo(start.x, start.y);

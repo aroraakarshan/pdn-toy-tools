@@ -6,6 +6,7 @@
 		grid,
 		width = $bindable(800),
 		height = $bindable(600),
+		renderTick = 0,
 		onrender,
 		onclick,
 		onmousemove,
@@ -14,6 +15,7 @@
 		grid: Grid;
 		width?: number;
 		height?: number;
+		renderTick?: number;
 		onrender?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 		onclick?: (e: MouseEvent, canvas: HTMLCanvasElement) => void;
 		onmousemove?: (e: MouseEvent, canvas: HTMLCanvasElement) => void;
@@ -50,32 +52,25 @@
 		}
 	}
 
-	// Re-render whenever dependencies change
-	$effect(() => {
-		// Touch reactive deps
-		grid;
-		onrender;
-		width;
-		height;
-
-		if (ctx) {
-			cancelAnimationFrame(animFrame);
-			animFrame = requestAnimationFrame(render);
-		}
-	});
-
+	// Continuous render loop — simple, reliable, no reactivity timing issues
 	onMount(() => {
 		resize();
 
+		let frameId: number;
+		function loop() {
+			render();
+			frameId = requestAnimationFrame(loop);
+		}
+		frameId = requestAnimationFrame(loop);
+
 		const ro = new ResizeObserver(() => {
 			resize();
-			render();
 		});
 		ro.observe(containerEl);
 
 		return () => {
+			cancelAnimationFrame(frameId);
 			ro.disconnect();
-			cancelAnimationFrame(animFrame);
 		};
 	});
 

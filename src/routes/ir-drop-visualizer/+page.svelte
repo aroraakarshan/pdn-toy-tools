@@ -13,9 +13,14 @@
 	let showHeatmap = $state(true);
 	let showFlow = $state(true);
 	let flowTime = $state(0);
-	let flowAnimFrame = $state(0);
+	let flowAnimFrame = 0;
 	let canvasW = $state(800);
 	let canvasH = $state(600);
+	let renderTick = $state(0);
+
+	function requestRender() {
+		renderTick++;
+	}
 
 	// Tooltip
 	let tooltipVisible = $state(false);
@@ -47,6 +52,7 @@
 	function solve() {
 		if (activeSources.size === 0) {
 			result = null;
+			requestRender();
 			return;
 		}
 
@@ -59,12 +65,14 @@
 		}
 
 		result = solveIRDrop(grid, sources);
+		requestRender();
 	}
 
 	function startFlowAnimation() {
 		cancelAnimationFrame(flowAnimFrame);
 		function animate() {
 			flowTime += 16;
+			requestRender();
 			flowAnimFrame = requestAnimationFrame(animate);
 		}
 		flowAnimFrame = requestAnimationFrame(animate);
@@ -172,6 +180,7 @@
 		grid = generateGrid({ ...DEFAULT_CONFIG, seed: Math.floor(Math.random() * 100000) });
 		activeSources = new Map();
 		result = null;
+		requestRender();
 	}
 </script>
 
@@ -270,6 +279,7 @@
 	<div class="canvas-area">
 		<Canvas
 			{grid}
+			{renderTick}
 			bind:width={canvasW}
 			bind:height={canvasH}
 			onrender={handleRender}

@@ -1,161 +1,110 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Canvas from '$lib/components/Canvas.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ResultsPanel from '$lib/components/ResultsPanel.svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
+	import PDNGrid3D from '$lib/three/PDNGrid3D.svelte';
 	import {
 		generateGrid,
 		dijkstraSPR,
 		yenKShortest,
-		findBumpAt,
-		findInstanceAt,
 		DEFAULT_CONFIG
 	} from '$lib/engine';
 	import type { Grid, Instance, Domain, PathResult } from '$lib/engine';
-	import {
-		renderGrid,
-		renderPath,
-		canvasToGrid,
-		type GridRenderOptions
-	} from '$lib/canvas/renderers';
+
+	const PATH_COLORS_HEX = ['#FF6B6B', '#4f8ff7', '#22c55e', '#fbbf24', '#a78bfa', '#f472b6', '#22d3ee', '#fb923c'];
 
 	let grid = $state(generateGrid({ ...DEFAULT_CONFIG, seed: 42 }));
 	let selectedSource = $state<Instance | null>(null);
 	let selectedTarget = $state<Domain | null>(null);
 	let paths = $state<PathResult[]>([]);
 	let pathCount = $state(3);
+	let animSpeed = $state(1.0);
 	let animating = $state(false);
-	let animProgress = $state(-1); // -1 = not animating, 0..1 = progress
-	let showLabels = $state(false);
-	let hoveredNode = $state<{ row: number; col: number } | null>(null);
-	let canvasW = $state(800);
-	let canvasH = $state(600);
+	let showHelp = $state(false);
 
-	// Tooltip state
-	let tooltipVisible = $state(false);
-	let tooltipX = $state(0);
-	let tooltipY = $state(0);
-	let tooltipText = $state('');
-
-	const PATH_COLORS = ['#4f8ff7', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
-
-	function handleRender(ctx: CanvasRenderingContext2D, w: number, h: number) {
-		const opts: Partial<GridRenderOptions> = {
-			showResistanceLabels: showLabels,
-			highlightedNode: hoveredNode,
-			selectedSource,
-			selectedTarget
-		};
-
-		renderGrid(ctx, grid, w, h, opts);
-
-		// Draw paths
-		for (let i = paths.length - 1; i >= 0; i--) {
-			const color = PATH_COLORS[i % PATH_COLORS.length];
-			const progress = i === 0 && animating ? animProgress : undefined;
-			renderPath(ctx, grid, paths[i].path, w, h, 48, color, progress);
-		}
+	function handleInstanceClick(inst: Instance) {
+		selectedSource = inst;
+		paths = [];
 	}
 
-	function handleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
-		const rect = canvas.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
-		const pos = canvasToGrid(x, y, canvasW, canvasH, grid, 48);
-		if (!pos) return;
-
-		const inst = findInstanceAt(grid, pos.row, pos.col);
-		const bump = findBumpAt(grid, pos.row, pos.col);
-
-		if (inst && !selectedSource) {
-			selectedSource = inst;
-		} else if (inst && selectedSource && inst.id !== selectedSource.id) {
-			selectedSource = inst;
-			paths = [];
-		} else if (bump && !selectedTarget) {
-			selectedTarget = grid.domains.find((d) => d.id === bump.domainId) ?? null;
-		} else if (bump && selectedTarget && bump.domainId !== selectedTarget.id) {
-			selectedTarget = grid.domains.find((d) => d.id === bump.domainId) ?? null;
-			paths = [];
-		}
+	function handleDomainClick(domain: Domain) {
+		selectedTarget = domain;
+		paths = [];
 	}
 
-	function handleMouseMove(e: MouseEvent, canvas: HTMLCanvasElement) {
-		const rect = canvas.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		const y = e.clientY - rect.top;
-		const pos = canvasToGrid(x, y, canvasW, canvasH, grid, 48);
-
-		hoveredNode = pos;
-
-		if (pos) {
-			const inst = findInstanceAt(grid, pos.row, pos.col);
-			const bump = findBumpAt(grid, pos.row, pos.col);
-
-			if (inst) {
-				tooltipText = `Instance ${inst.id.split('-')[1]} — R: ${inst.resistance.toFixed(3)}Ω`;
-				tooltipVisible = true;
-			} else if (bump) {
-				const domain = grid.domains.find((d) => d.id === bump.domainId);
-				tooltipText = `${domain?.name} Bump — R: ${bump.resistance.toFixed(3)}Ω`;
-				tooltipVisible = true;
-			} else {
-				const res = grid.resistances[pos.row][pos.col];
-				tooltipText = `Node (${pos.row},${pos.col})`;
-				if (res.right !== null) tooltipText += ` — R→: ${res.right.toFixed(3)}Ω`;
-				if (res.down !== null) tooltipText += ` — R↓: ${res.down.toFixed(3)}Ω`;
-				tooltipVisible = true;
-			}
-			tooltipX = e.clientX;
-			tooltipY = e.clientY;
-		} else {
-			tooltipVisible = false;
-		}
+	function selectSource(instId: string) {
+		selectedSource = grid.instances.find((i) => i.id === instId) ?? null;
+		paths = [];
 	}
 
-	function handleMouseLeave() {
-		hoveredNode = null;
-		tooltipVisible = false;
+	function selectTarget(val: string) {
+		if (val === 'auto') {
+			selectedTarget = null;
+			// Auto-find will pick nearest domain when finding path
+			findPathAuto();
+			return;
+		}
+		selectedTarget = grid.domains.find((d) => d.id === parseInt(val)) ?? null;
+		paths = [];
 	}
 
 	function findPath() {
-		if (!selectedSource || !selectedTarget) return;
+		if (!selectedSource) return;
+		if (!selectedTarget) {
+			findPathAuto();
+			return;
+		}
 		const result = dijkstraSPR(grid, selectedSource, selectedTarget);
 		if (result) {
+			animating = true;
 			paths = [result];
-			animatePath();
+		}
+	}
+
+	function findPathAuto() {
+		if (!selectedSource) return;
+		// Find shortest path across ALL domains, pick the best
+		let best: PathResult | null = null;
+		let bestDomain: Domain | null = null;
+		for (const domain of grid.domains) {
+			const result = dijkstraSPR(grid, selectedSource, domain);
+			if (result && (!best || result.totalResistance < best.totalResistance)) {
+				best = result;
+				bestDomain = domain;
+			}
+		}
+		if (best && bestDomain) {
+			selectedTarget = bestDomain;
+			animating = true;
+			paths = [best];
 		}
 	}
 
 	function findAllPaths() {
-		if (!selectedSource || !selectedTarget) return;
-		const results = yenKShortest(grid, selectedSource, selectedTarget, pathCount);
+		if (!selectedSource) return;
+		if (!selectedTarget) {
+			// Auto-detect best domain first
+			let bestR = Infinity;
+			let bestDomain: Domain | null = null;
+			for (const domain of grid.domains) {
+				const r = dijkstraSPR(grid, selectedSource, domain);
+				if (r && r.totalResistance < bestR) {
+					bestR = r.totalResistance;
+					bestDomain = domain;
+				}
+			}
+			if (bestDomain) selectedTarget = bestDomain;
+			else return;
+		}
+		const results = yenKShortest(grid, selectedSource, selectedTarget!, pathCount);
 		if (results.length > 0) {
+			animating = true;
 			paths = results;
-			animatePath();
 		}
 	}
 
-	function animatePath() {
-		animating = true;
-		animProgress = 0;
-		const start = performance.now();
-		const duration = 1500;
-
-		function step(now: number) {
-			const elapsed = now - start;
-			animProgress = Math.min(1, elapsed / duration);
-
-			if (animProgress < 1) {
-				requestAnimationFrame(step);
-			} else {
-				animating = false;
-				animProgress = -1;
-			}
-		}
-
-		requestAnimationFrame(step);
+	function handleAnimDone() {
+		animating = false;
 	}
 
 	function reset() {
@@ -163,7 +112,6 @@
 		selectedTarget = null;
 		paths = [];
 		animating = false;
-		animProgress = -1;
 	}
 
 	function newGrid() {
@@ -176,89 +124,133 @@
 	<title>SPR Visualizer — PDN Toy Tools</title>
 </svelte:head>
 
+{#if showHelp}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-overlay" onclick={() => (showHelp = false)} onkeydown={(e) => e.key === 'Escape' && (showHelp = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+			<button class="modal-close" onclick={() => (showHelp = false)}>✕</button>
+			<h2>What is SPR?</h2>
+			<p>
+				<strong>Shortest Path Resistance (SPR)</strong> measures the minimum resistance
+				from a current-consuming instance to a power supply bump in the PDN.
+			</p>
+			<h3>The 3D Grid</h3>
+			<ul>
+				<li><strong>Metal traces</strong> (silver bars) — resistive connections between nodes</li>
+				<li><strong>Bumps</strong> (colored cylinders rising up) — power supply from the package above</li>
+				<li><strong>Instances</strong> (purple cubes) — circuit blocks that consume current</li>
+				<li>Thicker/taller traces = lower resistance = better conductors</li>
+			</ul>
+			<h3>How to Use</h3>
+			<ol>
+				<li>Select a <strong>source instance</strong> (click a purple cube or use dropdown)</li>
+				<li>Optionally pick a target domain, or leave on <strong>Auto</strong></li>
+				<li>Click <strong>Find Shortest Path</strong> — watch it animate through the grid</li>
+				<li>Rotate the 3D view by dragging. Scroll to zoom.</li>
+			</ol>
+			<h3>Why Bumps?</h3>
+			<p>
+				In a real chip, power comes from the package through <strong>C4 bumps</strong> (solder balls).
+				Current flows from bumps → through the metal grid → to instances.
+				SPR tells you how "far" (electrically) an instance is from its power supply.
+			</p>
+		</div>
+	</div>
+{/if}
+
 <div class="tool-layout">
 	<Sidebar title="SPR Controls">
 		<div class="control-group">
-			<span class="control-label">Source Instance</span>
-			<div class="selection-display" class:active={selectedSource !== null}>
-				{#if selectedSource}
-					<span class="selection-badge source">I{selectedSource.id.split('-')[1]}</span>
-					<span class="selection-detail"
-						>({selectedSource.row},{selectedSource.col}) — {selectedSource.resistance.toFixed(3)}Ω</span
-					>
-				{:else}
-					<span class="selection-hint">Click an instance (□) on the grid</span>
-				{/if}
+			<div class="label-row">
+				<span class="control-label">Source Instance</span>
+				<button class="help-btn" onclick={() => (showHelp = true)} title="What is SPR?">?</button>
 			</div>
+			<select
+				class="dropdown"
+				value={selectedSource?.id ?? ''}
+				onchange={(e) => selectSource((e.target as HTMLSelectElement).value)}
+			>
+				<option value="">— Click a cube on the grid —</option>
+				{#each grid.instances as inst}
+					<option value={inst.id}>
+						Instance {inst.id.split('-')[1]} — ({inst.row},{inst.col}) — {inst.resistance.toFixed(3)}Ω
+					</option>
+				{/each}
+			</select>
 		</div>
 
 		<div class="control-group">
 			<span class="control-label">Target Domain</span>
-			<div class="selection-display" class:active={selectedTarget !== null}>
-				{#if selectedTarget}
-					<span class="selection-badge" style="background: {selectedTarget.color}"
-						>{selectedTarget.name}</span
-					>
-					<span class="selection-detail">{selectedTarget.bumps.length} bumps</span>
-				{:else}
-					<span class="selection-hint">Click a domain bump (●) on the grid</span>
-				{/if}
-			</div>
+			<select
+				class="dropdown"
+				value={selectedTarget?.id?.toString() ?? ''}
+				onchange={(e) => selectTarget((e.target as HTMLSelectElement).value)}
+			>
+				<option value="">Auto (nearest domain)</option>
+				{#each grid.domains as domain}
+					<option value={domain.id.toString()}>
+						{domain.name} — {domain.bumps.length} bumps
+					</option>
+				{/each}
+			</select>
+			<span class="hint">Leave on "Auto" to find the closest power supply</span>
 		</div>
 
 		<div class="control-group">
 			<label class="control-label" for="path-count">
-				Number of Paths: <strong>{pathCount}</strong>
+				Paths: <strong>{pathCount}</strong>
 			</label>
-			<input id="path-count" type="range" min="1" max="5" bind:value={pathCount} class="slider" />
+			<input id="path-count" type="range" min="1" max="8" bind:value={pathCount} class="slider" />
+		</div>
+
+		<div class="control-group">
+			<label class="control-label" for="anim-speed">
+				Speed: <strong>{animSpeed.toFixed(1)}x</strong>
+			</label>
+			<input id="anim-speed" type="range" min="0.3" max="3" step="0.1" bind:value={animSpeed} class="slider" />
 		</div>
 
 		<div class="button-group">
 			<button
 				class="btn btn-primary"
 				onclick={findPath}
-				disabled={!selectedSource || !selectedTarget || animating}
+				disabled={!selectedSource || animating}
 			>
-				Find Shortest Path
+				⚡ Shortest Path
 			</button>
 			<button
-				class="btn btn-secondary"
+				class="btn btn-accent"
 				onclick={findAllPaths}
-				disabled={!selectedSource || !selectedTarget || animating}
+				disabled={!selectedSource || animating}
 			>
-				Find {pathCount} Paths
+				🔀 {pathCount} Paths
 			</button>
 		</div>
 
 		<div class="button-group">
-			<button class="btn btn-ghost" onclick={reset}>Clear Selection</button>
-			<button class="btn btn-ghost" onclick={newGrid}>New Grid</button>
+			<button class="btn btn-ghost" onclick={reset}>✕ Clear</button>
+			<button class="btn btn-ghost" onclick={newGrid}>🔄 New Grid</button>
 		</div>
 
-		<div class="control-group">
-			<label class="toggle-label">
-				<input type="checkbox" bind:checked={showLabels} />
-				Show Resistance Labels
-			</label>
-		</div>
+		{#if animating}
+			<div class="anim-badge"><span class="pulse-dot"></span> Animating…</div>
+		{/if}
 
-		{#if paths.length > 0}
-			<ResultsPanel title="Path Results">
+		{#if paths.length > 0 && !animating}
+			<ResultsPanel title="Results">
 				{#each paths as path, i}
 					<div class="result-row">
-						<span class="path-dot" style="background: {PATH_COLORS[i % PATH_COLORS.length]}"
-						></span>
+						<span class="path-dot" style="background: {PATH_COLORS_HEX[i % PATH_COLORS_HEX.length]}"></span>
 						<span class="result-label">Path {i + 1}</span>
-						<span class="result-value mono">{path.totalResistance.toFixed(3)} Ω</span>
+						<span class="result-value mono">{path.totalResistance.toFixed(4)} Ω</span>
 					</div>
 					<div class="result-row sub">
-						<span class="result-label">Current (@ {grid.config.vdd}V)</span>
-						<span class="result-value mono"
-							>{(grid.config.vdd / path.totalResistance).toFixed(3)} A</span
-						>
+						<span class="result-label">Current @ {grid.config.vdd}V</span>
+						<span class="result-value mono">{(grid.config.vdd / path.totalResistance).toFixed(4)} A</span>
 					</div>
 					<div class="result-row sub">
-						<span class="result-label">Segments</span>
+						<span class="result-label">Hops</span>
 						<span class="result-value">{path.path.length - 1}</span>
 					</div>
 				{/each}
@@ -268,34 +260,37 @@
 		<div class="legend">
 			<h4 class="legend-title">Legend</h4>
 			<div class="legend-item">
-				<span class="legend-icon instance-icon"></span>
-				<span>Instance (current sink)</span>
+				<span class="legend-swatch" style="background: #22c55e"></span>
+				Selected source (green)
+			</div>
+			<div class="legend-item">
+				<span class="legend-swatch" style="background: #9B59B6; border-radius: 2px"></span>
+				Instance
 			</div>
 			{#each grid.domains as domain}
 				<div class="legend-item">
-					<span class="legend-icon bump-icon" style="background: {domain.color}"></span>
-					<span>{domain.name} Bump</span>
+					<span class="legend-swatch" style="background: {domain.color}; border-radius: 50%"></span>
+					{domain.name}
 				</div>
 			{/each}
 		</div>
+
+		<p class="tip">Drag to rotate · Scroll to zoom · Click cubes/bumps to select</p>
 	</Sidebar>
 
 	<div class="canvas-area">
-		<Canvas
+		<PDNGrid3D
 			{grid}
-			bind:width={canvasW}
-			bind:height={canvasH}
-			onrender={handleRender}
-			onclick={handleClick}
-			onmousemove={handleMouseMove}
-			onmouseleave={handleMouseLeave}
+			{selectedSource}
+			{selectedTarget}
+			{paths}
+			{animSpeed}
+			onInstanceClick={handleInstanceClick}
+			onDomainClick={handleDomainClick}
+			onAnimationDone={handleAnimDone}
 		/>
 	</div>
 </div>
-
-<Tooltip visible={tooltipVisible} x={tooltipX} y={tooltipY}>
-	{tooltipText}
-</Tooltip>
 
 <style>
 	.tool-layout {
@@ -306,69 +301,79 @@
 
 	.canvas-area {
 		flex: 1;
-		padding: 1rem;
 		min-width: 0;
 	}
 
-	/* Controls */
 	.control-group {
 		margin-bottom: 1rem;
 	}
 
-	.control-label {
-		display: block;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
+	.label-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 		margin-bottom: 0.4rem;
 	}
 
-	.selection-display {
-		padding: 0.6rem 0.75rem;
+	.control-label {
+		display: block;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--color-text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		margin-bottom: 0.4rem;
+	}
+
+	.label-row .control-label { margin-bottom: 0; }
+
+	.help-btn {
+		width: 22px; height: 22px;
+		border-radius: 50%;
+		border: 1px solid var(--color-border);
+		background: var(--color-bg-tertiary);
+		color: var(--color-text-muted);
+		font-size: 0.75rem; font-weight: 700;
+		cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+		transition: all 0.15s;
+	}
+
+	.help-btn:hover {
+		border-color: var(--color-accent-blue);
+		color: var(--color-accent-blue);
+	}
+
+	.dropdown {
+		width: 100%;
+		padding: 0.55rem 0.75rem;
 		background: var(--color-bg-tertiary);
 		border: 1px solid var(--color-border);
 		border-radius: 6px;
-		font-size: 0.85rem;
-		min-height: 42px;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		color: var(--color-text-primary);
+		font-size: 0.82rem;
+		cursor: pointer;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%236b7294' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 0.75rem center;
+		padding-right: 2rem;
 	}
 
-	.selection-display.active {
+	.dropdown:focus {
+		outline: none;
 		border-color: var(--color-accent-blue);
 	}
 
-	.selection-badge {
-		padding: 0.15rem 0.5rem;
-		border-radius: 4px;
-		font-weight: 600;
-		font-size: 0.75rem;
-		color: #fff;
-	}
-
-	.selection-badge.source {
-		background: #22d3ee;
-		color: #000;
-	}
-
-	.selection-detail {
-		color: var(--color-text-secondary);
-		font-size: 0.8rem;
-	}
-
-	.selection-hint {
+	.hint {
+		display: block;
+		font-size: 0.72rem;
 		color: var(--color-text-muted);
-		font-size: 0.8rem;
+		margin-top: 0.3rem;
 		font-style: italic;
 	}
 
-	.slider {
-		width: 100%;
-		accent-color: var(--color-accent-blue);
-	}
+	.slider { width: 100%; accent-color: var(--color-accent-blue); }
 
 	.button-group {
 		display: flex;
@@ -378,141 +383,116 @@
 
 	.btn {
 		flex: 1;
-		padding: 0.6rem 0.75rem;
-		border-radius: 6px;
-		border: none;
-		font-size: 0.8rem;
-		font-weight: 600;
+		padding: 0.6rem 0.5rem;
+		border-radius: 6px; border: none;
+		font-size: 0.78rem; font-weight: 600;
 		cursor: pointer;
 		transition: all 0.15s ease;
+		white-space: nowrap;
 	}
 
-	.btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
+	.btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-	.btn-primary {
-		background: var(--color-accent-blue);
-		color: #fff;
-	}
+	.btn-primary { background: var(--color-accent-blue); color: #fff; }
+	.btn-primary:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
 
-	.btn-primary:hover:not(:disabled) {
-		background: #3a7ae0;
-	}
-
-	.btn-secondary {
-		background: var(--color-bg-tertiary);
-		color: var(--color-text-primary);
-		border: 1px solid var(--color-border);
-	}
-
-	.btn-secondary:hover:not(:disabled) {
-		border-color: var(--color-border-hover);
-	}
+	.btn-accent { background: var(--color-accent-purple); color: #fff; }
+	.btn-accent:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
 
 	.btn-ghost {
 		background: transparent;
 		color: var(--color-text-secondary);
 		border: 1px solid var(--color-border);
 	}
+	.btn-ghost:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
 
-	.btn-ghost:hover {
+	.anim-badge {
+		display: flex; align-items: center; gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
 		background: var(--color-bg-tertiary);
-		color: var(--color-text-primary);
+		border: 1px solid var(--color-accent-green);
+		border-radius: 6px;
+		font-size: 0.82rem; font-weight: 600;
+		color: var(--color-accent-green);
+		margin-bottom: 0.75rem;
 	}
 
-	.toggle-label {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.85rem;
-		color: var(--color-text-secondary);
-		cursor: pointer;
+	.pulse-dot {
+		width: 8px; height: 8px; border-radius: 50%;
+		background: var(--color-accent-green);
+		animation: pulse 1s ease-in-out infinite;
 	}
 
-	/* Results */
-	.result-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.3rem 0;
-	}
+	@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-	.result-row.sub {
-		padding-left: 1.25rem;
-		font-size: 0.8rem;
-	}
+	.result-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; }
+	.result-row.sub { padding-left: 1.25rem; font-size: 0.8rem; }
 
-	.path-dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
+	.path-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-	.result-label {
-		flex: 1;
-		color: var(--color-text-secondary);
-		font-size: 0.85rem;
-	}
+	.result-label { flex: 1; color: var(--color-text-secondary); font-size: 0.83rem; }
+	.result-value { font-weight: 600; font-size: 0.83rem; }
+	.mono { font-family: 'JetBrains Mono', monospace; }
 
-	.result-value {
-		font-weight: 600;
-		font-size: 0.85rem;
-	}
-
-	.mono {
-		font-family: 'JetBrains Mono', monospace;
-	}
-
-	/* Legend */
 	.legend {
-		margin-top: 1.5rem;
-		padding-top: 1rem;
+		margin-top: 1.5rem; padding-top: 1rem;
 		border-top: 1px solid var(--color-border);
 	}
 
 	.legend-title {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--color-text-muted);
+		font-size: 0.7rem; text-transform: uppercase;
+		letter-spacing: 0.06em; color: var(--color-text-muted);
 		margin: 0 0 0.5rem;
 	}
 
 	.legend-item {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.8rem;
-		color: var(--color-text-secondary);
-		padding: 0.2rem 0;
+		display: flex; align-items: center; gap: 0.5rem;
+		font-size: 0.8rem; color: var(--color-text-secondary); padding: 0.2rem 0;
 	}
 
-	.legend-icon {
-		width: 12px;
-		height: 12px;
-		flex-shrink: 0;
+	.legend-swatch { width: 12px; height: 12px; flex-shrink: 0; border-radius: 3px; }
+
+	.tip {
+		margin-top: 1rem;
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+		text-align: center;
+		line-height: 1.5;
 	}
 
-	.instance-icon {
-		background: #22d3ee;
-		border-radius: 2px;
+	/* Help Modal */
+	.modal-overlay {
+		position: fixed; inset: 0; z-index: 100;
+		background: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(4px);
+		display: flex; align-items: center; justify-content: center;
+		padding: 2rem;
 	}
 
-	.bump-icon {
-		border-radius: 50%;
+	.modal {
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: 12px; padding: 2rem;
+		max-width: 560px; width: 100%;
+		max-height: 80vh; overflow-y: auto;
+		position: relative;
 	}
+
+	.modal h2 { font-size: 1.3rem; margin: 0 0 1rem; color: var(--color-accent-blue); }
+	.modal h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
+	.modal p, .modal li { color: var(--color-text-secondary); font-size: 0.9rem; line-height: 1.7; }
+	.modal ul, .modal ol { padding-left: 1.25rem; margin: 0.5rem 0; }
+	.modal li { margin-bottom: 0.3rem; }
+
+	.modal-close {
+		position: absolute; top: 1rem; right: 1rem;
+		background: none; border: none;
+		color: var(--color-text-muted); font-size: 1.2rem; cursor: pointer;
+	}
+	.modal-close:hover { color: var(--color-text-primary); }
 
 	@media (max-width: 768px) {
-		.tool-layout {
-			flex-direction: column;
-		}
-
-		.canvas-area {
-			height: 50vh;
-			padding: 0.5rem;
-		}
+		.tool-layout { flex-direction: column; }
+		.canvas-area { height: 50vh; }
 	}
 </style>

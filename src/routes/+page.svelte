@@ -1,5 +1,36 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { onMount } from 'svelte';
+	import ParticleBackground from '$lib/components/ParticleBackground.svelte';
+
+	let mounted = $state(false);
+	let sectionsEl: HTMLElement[] = [];
+
+	onMount(() => {
+		mounted = true;
+
+		// Intersection Observer for scroll-in animations
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('visible');
+						observer.unobserve(entry.target);
+					}
+				}
+			},
+			{ threshold: 0.1 }
+		);
+
+		// Observe all animated elements after a tick
+		requestAnimationFrame(() => {
+			document
+				.querySelectorAll('.animate-in')
+				.forEach((el) => observer.observe(el));
+		});
+
+		return () => observer.disconnect();
+	});
 </script>
 
 <svelte:head>
@@ -10,8 +41,10 @@
 	/>
 </svelte:head>
 
+<ParticleBackground />
+
 <section class="hero">
-	<div class="hero-content">
+	<div class="hero-content" class:mounted>
 		<h1>
 			<span class="gradient-text">PDN Toy Tools</span>
 		</h1>
@@ -32,7 +65,7 @@
 	</div>
 </section>
 
-<section id="about" class="section">
+<section id="about" class="section animate-in">
 	<div class="container">
 		<h2>What is EMIR?</h2>
 		<p class="section-intro">
@@ -46,9 +79,9 @@
 
 <section id="tools" class="section">
 	<div class="container">
-		<h2>Interactive Analysis Tools</h2>
+		<h2 class="animate-in">Interactive Analysis Tools</h2>
 		<div class="tools-grid">
-			<a href="{base}/spr-visualizer" class="tool-card">
+			<a href="{base}/spr-visualizer" class="tool-card animate-in">
 				<div class="tool-icon">
 					<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
 						<circle cx="8" cy="8" r="4" fill="var(--color-accent-cyan)" />
@@ -71,7 +104,7 @@
 				<span class="tool-cta">Launch Tool →</span>
 			</a>
 
-			<a href="{base}/ir-drop-visualizer" class="tool-card">
+			<a href="{base}/ir-drop-visualizer" class="tool-card animate-in">
 				<div class="tool-icon">
 					<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
 						<rect x="4" y="4" width="40" height="40" rx="4" fill="var(--color-accent-red)" fill-opacity="0.15" />
@@ -93,24 +126,24 @@
 
 <section id="benefits" class="section">
 	<div class="container">
-		<h2>Why Interactive Simulation Works</h2>
+		<h2 class="animate-in">Why Interactive Simulation Works</h2>
 		<div class="benefits-grid">
-			<div class="benefit-card">
+			<div class="benefit-card animate-in">
 				<span class="benefit-icon">🧠</span>
 				<h4>Intuitive Understanding</h4>
 				<p>See voltage distributions and current paths, not just numbers in a report.</p>
 			</div>
-			<div class="benefit-card">
+			<div class="benefit-card animate-in">
 				<span class="benefit-icon">⚡</span>
 				<h4>Real Solvers</h4>
 				<p>Gauss-Seidel nodal analysis and Dijkstra/Yen's algorithms — not approximations.</p>
 			</div>
-			<div class="benefit-card">
+			<div class="benefit-card animate-in">
 				<span class="benefit-icon">🔬</span>
 				<h4>Safe Exploration</h4>
 				<p>Experiment with parameters and see immediate results — no risk, instant feedback.</p>
 			</div>
-			<div class="benefit-card">
+			<div class="benefit-card animate-in">
 				<span class="benefit-icon">📐</span>
 				<h4>Step-Through Mode</h4>
 				<p>Watch algorithms solve step by step — understand the why, not just the what.</p>
@@ -130,6 +163,16 @@
 </footer>
 
 <style>
+	/* All landing page content sits above the particle canvas */
+	.hero,
+	:global(#about),
+	:global(#tools),
+	:global(#benefits),
+	.footer {
+		position: relative;
+		z-index: 1;
+	}
+
 	.hero {
 		min-height: calc(100vh - var(--nav-height));
 		display: flex;
@@ -139,12 +182,21 @@
 		padding: 2rem;
 	}
 
+	/* Hero entrance animation */
 	.hero-content {
 		max-width: 720px;
+		opacity: 0;
+		transform: translateY(30px);
+		transition: opacity 0.8s ease, transform 0.8s ease;
+	}
+
+	.hero-content.mounted {
+		opacity: 1;
+		transform: translateY(0);
 	}
 
 	.hero h1 {
-		font-size: clamp(2.5rem, 6vw, 4rem);
+		font-size: clamp(2.5rem, 6vw, 4.5rem);
 		font-weight: 700;
 		margin: 0 0 1rem;
 		line-height: 1.1;
@@ -227,6 +279,35 @@
 		line-height: 1.8;
 	}
 
+	/* Scroll-in animation */
+	:global(.animate-in) {
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+	}
+
+	:global(.animate-in.visible) {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	/* Stagger cards within a grid */
+	:global(.tools-grid .animate-in:nth-child(2)) {
+		transition-delay: 0.15s;
+	}
+
+	:global(.benefits-grid .animate-in:nth-child(2)) {
+		transition-delay: 0.1s;
+	}
+
+	:global(.benefits-grid .animate-in:nth-child(3)) {
+		transition-delay: 0.2s;
+	}
+
+	:global(.benefits-grid .animate-in:nth-child(4)) {
+		transition-delay: 0.3s;
+	}
+
 	/* Tools grid */
 	.tools-grid {
 		display: grid;
@@ -236,7 +317,8 @@
 	}
 
 	.tool-card {
-		background: var(--color-bg-card);
+		background: rgba(30, 34, 48, 0.8);
+		backdrop-filter: blur(8px);
 		border: 1px solid var(--color-border);
 		border-radius: 16px;
 		padding: 2rem;
@@ -249,14 +331,19 @@
 
 	.tool-card:hover {
 		border-color: var(--color-accent-blue);
-		transform: translateY(-4px);
-		box-shadow: var(--shadow-glow);
+		transform: translateY(-6px);
+		box-shadow: 0 0 30px rgba(79, 143, 247, 0.15);
+	}
+
+	.tool-card:hover .tool-icon {
+		transform: scale(1.1) rotate(5deg);
 	}
 
 	.tool-icon {
 		width: 56px;
 		height: 56px;
 		margin-bottom: 1.25rem;
+		transition: transform 0.3s ease;
 	}
 
 	.tool-icon svg {
@@ -280,6 +367,11 @@
 		color: var(--color-accent-blue);
 		font-weight: 600;
 		font-size: 0.9rem;
+		transition: gap 0.2s ease;
+	}
+
+	.tool-card:hover .tool-cta {
+		letter-spacing: 0.02em;
 	}
 
 	/* Benefits */
@@ -291,10 +383,18 @@
 	}
 
 	.benefit-card {
-		background: var(--color-bg-secondary);
+		background: rgba(26, 29, 39, 0.7);
+		backdrop-filter: blur(8px);
 		border: 1px solid var(--color-border);
 		border-radius: 12px;
 		padding: 1.5rem;
+		transition: all 0.3s ease;
+	}
+
+	.benefit-card:hover {
+		border-color: var(--color-accent-blue);
+		transform: translateY(-4px);
+		box-shadow: 0 0 20px rgba(79, 143, 247, 0.1);
 	}
 
 	.benefit-icon {
