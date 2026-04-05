@@ -212,8 +212,8 @@ disabled={!selectedSource || animating}>
 <div class="button-sep"></div>
 
 <!-- ── NARRATION ── -->
-<div class="narration">
 {#if phase === 'idle'}
+<div class="narration">
 <div class="narr-step">
 <div class="narr-icon">💡</div>
 <div class="narr-body">
@@ -229,90 +229,8 @@ Select an instance, pick a domain with bumps, then click
 </div>
 </div>
 </div>
-{:else if phase === 'intro'}
-<div class="narr-step">
-<div class="narr-icon">🔍</div>
-<div class="narr-body">
-<div class="narr-title">Searching {totalBumps} bumps in {selectedTarget?.name}…</div>
-<div class="narr-text">
-Instance <strong style="color:#22c55e">{selectedSource?.id}</strong> needs
-power. The domain has <strong>{totalBumps} bumps</strong> it could
-connect to. We'll find the path to each one — simultaneously.
-</div>
-<div class="narr-text dim">
-Watch {totalBumps} colored paths race through the metal layers…
-</div>
-</div>
-</div>
-{:else if phase === 'racing'}
-<div class="narr-step">
-<div class="narr-icon">🏁</div>
-<div class="narr-body">
-<div class="narr-title">Racing to all {totalBumps} bumps…</div>
-<div class="narr-meter-bar">
-<div class="narr-meter-fill" style="width: {(doneCount / totalBumps) * 100}%"></div>
-</div>
-<div class="narr-text">{doneCount} of {totalBumps} paths complete</div>
-{#if donePaths.length > 0}
-<div class="narr-results">
-{#each donePaths.slice(0, 5) as dp, i}
-<div class="narr-row" class:narr-best={i === 0 && donePaths.length > 1}>
-<span class="narr-dot" style="background:{PATH_COLORS_HEX[dp.idx % PATH_COLORS_HEX.length]}"></span>
-<span class="narr-label">{dp.label}</span>
-<span class="narr-r">{dp.r.toFixed(3)}Ω</span>
-{#if i === 0 && donePaths.length > 1}
-<span class="narr-best-tag">best so far</span>
-{/if}
-</div>
-{/each}
-{#if donePaths.length > 5}
-<div class="narr-text dim">+{donePaths.length - 5} more…</div>
-{/if}
 </div>
 {/if}
-</div>
-</div>
-{:else if phase === 'done'}
-<div class="narr-step winner-step">
-<div class="narr-icon">⭐</div>
-<div class="narr-body">
-<div class="narr-title">SPR Found!</div>
-{#if donePaths.length > 0}
-<div class="narr-text">
-Out of <strong>{donePaths.length} bumps</strong>, the path to
-<strong style="color:#ffd700">{donePaths[0].label}</strong> has the
-<strong>lowest total resistance</strong>:
-</div>
-<div class="narr-winner-value">{donePaths[0].r.toFixed(4)} Ω</div>
-<div class="narr-text dim">That's the SPR — the best-case power delivery path.</div>
-
-{#if donePaths.length > 1}
-<div class="narr-comparison">
-<div class="narr-text" style="font-weight:600; margin-top:0.5rem">All bumps ranked:</div>
-{#each donePaths as dp, i}
-<div class="narr-row" class:narr-winner={i === 0}>
-<span class="narr-rank">{i + 1}.</span>
-<span class="narr-dot" style="background:{PATH_COLORS_HEX[dp.idx % PATH_COLORS_HEX.length]}"></span>
-<span class="narr-label">{dp.label}</span>
-<span class="narr-r">{dp.r.toFixed(4)}Ω</span>
-{#if i === 0}
-<span class="narr-badge">SPR ⭐</span>
-{:else}
-<span class="narr-diff">+{(dp.r - donePaths[0].r).toFixed(4)}</span>
-{/if}
-</div>
-{/each}
-</div>
-<div class="narr-text dim" style="margin-top:0.5rem">
-The worst bump has {((1 - donePaths[0].r / donePaths[donePaths.length - 1].r) * 100).toFixed(1)}%
-more resistance. Bump placement matters!
-</div>
-{/if}
-{/if}
-</div>
-</div>
-{/if}
-</div>
 
 <div class="legend">
 <h4 class="legend-title">Metal Stack (bottom → top)</h4>
@@ -340,12 +258,89 @@ onDomainClick={handleDomainClick}
 onAnimationDone={handleAnimDone}
 onAnimationStep={handleAnimStep}
 />
+
+{#if phase !== 'idle'}
+<div class="narr-overlay">
+{#if phase === 'intro'}
+<div class="narr-step">
+<div class="narr-icon">🔍</div>
+<div class="narr-body">
+<div class="narr-title">Searching {totalBumps} bumps in {selectedTarget?.name}</div>
+<div class="narr-text">
+Finding path from
+<strong style="color:#22c55e">{selectedSource?.id}</strong>
+to each of <strong>{totalBumps} bumps</strong> simultaneously.
+</div>
+</div>
+</div>
+{:else if phase === 'racing'}
+<div class="narr-step">
+<div class="narr-icon">🏁</div>
+<div class="narr-body">
+<div class="narr-title">Racing to {totalBumps} bumps</div>
+<div class="narr-meter-bar">
+<div class="narr-meter-fill" style="width: {(doneCount / totalBumps) * 100}%"></div>
+</div>
+<div class="narr-text">{doneCount} / {totalBumps} complete</div>
+{#if donePaths.length > 0}
+<div class="narr-results">
+{#each donePaths.slice(0, 8) as dp, i}
+<div class="narr-row" class:narr-best={i === 0 && donePaths.length > 1}>
+<span class="narr-dot" style="background:{PATH_COLORS_HEX[dp.idx % PATH_COLORS_HEX.length]}"></span>
+<span class="narr-label">{dp.label}</span>
+<span class="narr-r">{dp.r.toFixed(3)}Ω</span>
+{#if i === 0 && donePaths.length > 1}
+<span class="narr-best-tag">best</span>
+{/if}
+</div>
+{/each}
+</div>
+{/if}
+</div>
+</div>
+{:else if phase === 'done'}
+<div class="narr-step winner-step">
+<div class="narr-icon">⭐</div>
+<div class="narr-body">
+<div class="narr-title">SPR Found!</div>
+{#if donePaths.length > 0}
+<div class="narr-winner-value">{donePaths[0].r.toFixed(4)} Ω</div>
+<div class="narr-text">
+<strong style="color:#ffd700">{donePaths[0].label}</strong> — lowest resistance of {donePaths.length} bumps.
+</div>
+{#if donePaths.length > 1}
+<div class="narr-comparison">
+{#each donePaths as dp, i}
+<div class="narr-row" class:narr-winner={i === 0}>
+<span class="narr-rank">{i + 1}.</span>
+<span class="narr-dot" style="background:{PATH_COLORS_HEX[dp.idx % PATH_COLORS_HEX.length]}"></span>
+<span class="narr-label">{dp.label}</span>
+<span class="narr-r">{dp.r.toFixed(4)}Ω</span>
+{#if i === 0}
+<span class="narr-badge">SPR ⭐</span>
+{:else}
+<span class="narr-diff">+{(dp.r - donePaths[0].r).toFixed(4)}</span>
+{/if}
+</div>
+{/each}
+</div>
+<div class="narr-text dim">
+{((1 - donePaths[0].r / donePaths[donePaths.length - 1].r) * 100).toFixed(1)}%
+less resistance than worst path.
+</div>
+{/if}
+{/if}
+</div>
+</div>
+{/if}
+</div>
+{/if}
 </div>
 </div>
 
 <style>
 .tool-layout { display: flex; height: calc(100vh - var(--nav-height)); overflow: hidden; }
-.canvas-area { flex: 1; min-width: 0; }
+.canvas-area { flex: 1; min-width: 0; position: relative; }
 .control-group { margin-bottom: 1rem; }
 .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
 .control-label {
@@ -446,6 +441,29 @@ max-height: 80vh; overflow-y: auto; position: relative;
 .modal li { margin-bottom: 0.2rem; }
 .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--color-text-muted); font-size: 1.2rem; cursor: pointer; }
 .modal-close:hover { color: var(--color-text-primary); }
+
+
+/* Narration overlay — right side of 3D canvas */
+.narr-overlay {
+position: absolute;
+top: 1rem; right: 1rem;
+width: 320px;
+max-height: calc(100% - 2rem);
+overflow-y: auto;
+background: rgba(6, 10, 20, 0.88);
+backdrop-filter: blur(12px);
+border: 1px solid rgba(79, 143, 247, 0.25);
+border-radius: 10px;
+z-index: 10;
+pointer-events: auto;
+box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+from { opacity: 0; transform: translateX(20px); }
+to { opacity: 1; transform: translateX(0); }
+}
 
 @media (max-width: 768px) {
 .tool-layout { flex-direction: column; }

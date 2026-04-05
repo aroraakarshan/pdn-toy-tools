@@ -660,12 +660,12 @@ for (let i = 1; i < tracks.length; i++) {
 if (tracks[i].totalR < tracks[winIdx].totalR) winIdx = i;
 }
 
-// Dim all existing completed tubes — keep them visible for comparison
+// Dim all existing completed tubes — keep them clearly visible for comparison
 pathGroup.traverse((obj: any) => {
 if (obj.userData?.trackIdx !== undefined) {
 const mat = obj.material as any;
-mat.opacity = 0.3;
-mat.emissiveIntensity = 0.1;
+mat.opacity = 0.55;
+mat.emissiveIntensity = 0.25;
 }
 });
 
