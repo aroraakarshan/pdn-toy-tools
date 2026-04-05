@@ -722,6 +722,7 @@ labelGroup.add(startLabel);
 // ── Follow path camera (first-person ride-along) ──
 let followPathCurve: any = null;
 let followTracer: any = null;
+let followCameraReady = false;
 
 function startFollowPath(trackIdx: number) {
 const track = tracks[trackIdx];
@@ -733,6 +734,7 @@ if (followTracer) { pathGroup.remove(followTracer); followTracer = null; }
 followTrackIdx = trackIdx;
 followProgress = 0;
 followActive = true;
+followCameraReady = false;
 
 // Smooth spline through path points
 followPathCurve = new THREE.CatmullRomCurve3(
@@ -745,6 +747,9 @@ followTracer = new THREE.Mesh(particleGeo, tracerMat);
 followTracer.scale.setScalar(2.5);
 const tracerGlow = new THREE.PointLight(0x4f8ff7, 2.5, 8.0);
 followTracer.add(tracerGlow);
+// Place tracer at start and keep it there until camera arrives
+const startPos = followPathCurve.getPointAt(0);
+followTracer.position.copy(startPos);
 pathGroup.add(followTracer);
 
 // Highlight followed path, dim everything else
@@ -769,12 +774,30 @@ if (followTracer) { pathGroup.remove(followTracer); followTracer = null; }
 followActive = false;
 followTrackIdx = -1;
 followPathCurve = null;
+followCameraReady = false;
 }
 
 function tickFollowCamera() {
 if (!followActive || !followMode || followTrackIdx < 0) return;
 if (!followPathCurve) { cleanupFollow(); return; }
 
+const startPos = followPathCurve.getPointAt(0);
+const targetCamStart = startPos.clone().add(new THREE.Vector3(3, 2.0, 3));
+
+// Phase 1: Wait for camera to arrive near the tracer start before moving
+if (!followCameraReady) {
+camera.position.lerp(targetCamStart, 0.06);
+controls.target.lerp(startPos, 0.08);
+controls.update();
+
+const dist = camera.position.distanceTo(targetCamStart);
+if (dist < 1.0) {
+followCameraReady = true;
+}
+return;
+}
+
+// Phase 2: Camera is in position — tracer and camera move together
 followProgress += 0.003 * localAnimSpeed;
 
 if (followProgress >= 1) {
@@ -792,7 +815,6 @@ const tracerPos = followPathCurve.getPointAt(tracerT);
 followTracer.position.copy(tracerPos);
 
 // Stable drone-style camera: fixed offset, heavy damping
-// No direction-based offset — eliminates nausea from via transitions
 const targetCamPos = tracerPos.clone().add(new THREE.Vector3(3, 2.0, 3));
 const targetLookAt = tracerPos.clone();
 
