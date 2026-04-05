@@ -3,10 +3,16 @@ node_modules/
 
 # Build output
 build/
+dist/
 .svelte-kit/
+
+# Environment
+.env
+.env.*
 
 # OS / Editor
 .DS_Store
+Thumbs.db
 *.log
 .vscode/
 .idea/
