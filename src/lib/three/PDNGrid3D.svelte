@@ -101,6 +101,25 @@ controls.maxDistance = 65;
 controls.maxPolarAngle = Math.PI / 2.05;
 controls.update();
 
+// ── Smooth camera animation ──
+let cameraTarget: { pos: InstanceType<typeof THREE.Vector3>; lookAt: InstanceType<typeof THREE.Vector3>; } | null = null;
+let cameraAnimProgress = 1; // 1 = not animating
+const CAMERA_SPEED = 0.015;
+
+function smoothCameraTo(pos: InstanceType<typeof THREE.Vector3>, lookAt: InstanceType<typeof THREE.Vector3>) {
+cameraTarget = { pos: pos.clone(), lookAt: lookAt.clone() };
+cameraAnimProgress = 0;
+}
+
+function tickCamera() {
+if (!cameraTarget || cameraAnimProgress >= 1) return;
+cameraAnimProgress = Math.min(1, cameraAnimProgress + CAMERA_SPEED);
+const t = cameraAnimProgress * cameraAnimProgress * (3 - 2 * cameraAnimProgress); // smoothstep
+camera.position.lerp(cameraTarget.pos, t * 0.04);
+controls.target.lerp(cameraTarget.lookAt, t * 0.04);
+controls.update();
+}
+
 // ── Lighting ──
 scene.add(new THREE.AmbientLight(0x4060a0, 1.1));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -404,9 +423,18 @@ afterSeg: pts.length - 1
 }
 }
 
-// Rise to bump level
+// Final point at bump level (top of stack)
 const end = flatPath[flatPath.length - 1];
-pts.push(new THREE.Vector3(end.col, BUMP_BASE + BUMP_H / 2, end.row));
+const lastPt = pts[pts.length - 1];
+// Only add bump-rise if we aren't already above M4
+if (lastPt.y < BUMP_BASE) {
+// Via up through remaining layers to M4 if needed
+if (currentLayer < 3) {
+pts.push(new THREE.Vector3(end.col, LAYER_YS[3] + PATH_LIFT, end.row));
+}
+// Final rise to bump
+pts.push(new THREE.Vector3(end.col, BUMP_BASE, end.row));
+}
 
 return { pts, labels };
 }
@@ -458,14 +486,15 @@ trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
 trailGeo.setDrawRange(0, 0);
 
 const color = PATH_COLORS[idx % PATH_COLORS.length];
-const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
+const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, linewidth: 3 }));
 pathGroup.add(trailLine);
 
-const pMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+const pMat = new THREE.MeshBasicMaterial({ color });
 const particle = new THREE.Mesh(particleGeo, pMat);
+particle.scale.setScalar(1.4);
 particle.position.copy(pts[0]);
 pathGroup.add(particle);
-const pLight = new THREE.PointLight(color, 0.4, 2.0);
+const pLight = new THREE.PointLight(color, 1.2, 4.0);
 particle.add(pLight);
 
 return {
@@ -484,6 +513,12 @@ bumpLabel: p.bumpLabel ?? `Bump ${idx + 1}`
 });
 
 animActive = true;
+
+// Camera: pull back for overview of all paths
+const overviewPos = new THREE.Vector3(cx + 10, midY + 10, cz + 16);
+const overviewLook = new THREE.Vector3(cx, midY, cz);
+smoothCameraTo(overviewPos, overviewLook);
+
 onAnimationStep?.({
 phase: 'started',
 pathIdx: 0,
@@ -495,7 +530,7 @@ runningTotal: 0
 function tickAnimation(dt: number) {
 if (!animActive || !tracks.length) return;
 
-const speed = 0.028 * localAnimSpeed;
+const speed = 0.022 * localAnimSpeed;
 let allDone = true;
 
 for (const track of tracks) {
@@ -522,8 +557,11 @@ const curvePath = new (THREE.CurvePath as any)();
 for (let i = 0; i < pts.length - 1; i++) {
 curvePath.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
 }
-const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 5, 0.04, 8, false);
-const tubeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
+const tubeGeo = new THREE.TubeGeometry(curvePath, pts.length * 6, 0.07, 10, false);
+const tubeMat = new THREE.MeshStandardMaterial({
+color, emissive: color, emissiveIntensity: 0.4,
+transparent: true, opacity: 0.85, roughness: 0.3, metalness: 0.6
+});
 const tube = new THREE.Mesh(tubeGeo, tubeMat);
 tube.userData = { trackIdx: track.idx };
 pathGroup.add(tube);
@@ -599,7 +637,7 @@ runningTotal: 0
 
 if (allDone) {
 animActive = false;
-setTimeout(() => highlightWinner(), 500);
+setTimeout(() => highlightWinner(), 1500);
 onAnimationStep?.({
 phase: 'allDone',
 pathIdx: 0,
@@ -626,16 +664,22 @@ if (obj.userData?.trackIdx !== undefined) {
 const mat = obj.material as any;
 if (obj.userData.trackIdx === winIdx) {
 mat.opacity = 1.0;
-obj.scale.set(1.6, 1.6, 1.6);
+mat.emissiveIntensity = 0.8;
+obj.scale.set(2.0, 2.0, 2.0);
 } else {
-mat.opacity = 0.2;
+mat.opacity = 0.15;
+mat.emissiveIntensity = 0.05;
 }
 }
 });
 
-// Winner label
+// Camera zooms toward winner
 const winPts = tracks[winIdx].pts;
 const mid = winPts[Math.floor(winPts.length / 2)];
+const winCamPos = new THREE.Vector3(mid.x + 6, mid.y + 5, mid.z + 8);
+smoothCameraTo(winCamPos, mid.clone());
+
+// Winner label
 const winSp = makeTextSprite(
 '\u2B50 LOWEST RESISTANCE = SPR',
 '#ffd700', 1.2
@@ -702,6 +746,7 @@ requestAnimationFrame(loop);
 const now = performance.now();
 const dt = now - lastTime;
 lastTime = now;
+tickCamera();
 controls.update();
 tickAnimation(dt);
 tickFlowParticles();
