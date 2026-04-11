@@ -31,14 +31,19 @@
 	let tooltipY = $state(0);
 	let tooltipText = $state('');
 
-	// Guided onboarding
+	// Monotonic tutorial progress — only moves forward, never back
+	let tutorialProgress = $state(0); // 0→1→2→3→4
+
+	const GUIDE_STEPS: Record<number, { step: number; total: number; icon: string; text: string }> = {
+		0: { step: 1, total: 4, icon: '👇', text: 'Click a purple cube to activate a load — it will start drawing current from the power bumps through the wire mesh.' },
+		1: { step: 2, total: 4, icon: '⚡', text: 'Load activated! Click the same cube again to inspect the V=IR path. Use the Current slider in the sidebar to increase the load.' },
+		2: { step: 3, total: 4, icon: '🔍', text: 'The yellow path shows voltage dropping hop by hop — check the V=IR table in the sidebar! Try clicking loads far from bumps for bigger drops.' },
+		3: { step: 4, total: 4, icon: '🌡️', text: 'Great! Try adding more loads to see how they affect each other. Toggle Heatmap in the sidebar to see voltage as wire color (green=good, red=drop).' }
+	};
+
 	let guideStep = $derived.by(() => {
-		if (guideDismissed) return null;
-		if (activeSources.size === 0) return { step: 1, total: 4, icon: '👇', text: 'Click a purple cube to activate a load — notice how all voltage columns are tall and green (1.0V everywhere, no drop yet)' };
-		if (!result) return { step: 2, total: 4, icon: '⚡', text: 'Power is being drawn! Use the Current slider to increase load. Watch the columns shrink and change color — that\'s IR drop!' };
-		if (showHeatmap && showFlow) return { step: 3, total: 4, icon: '🌡️', text: 'Hover any wire to see the V=IR math. The pulsing red ring marks the worst voltage drop. Try adding loads far from bumps!' };
-		if (!showHeatmap || !showFlow) return { step: 4, total: 4, icon: '🎛️', text: 'Toggle Heatmap and Current Flow in the sidebar to isolate different views of the voltage and current' };
-		return null;
+		if (guideDismissed || tutorialProgress >= 4) return null;
+		return GUIDE_STEPS[tutorialProgress] ?? null;
 	});
 
 	function toggleSource(instanceId: string) {
@@ -81,16 +86,36 @@
 
 	function handleInstanceClick(inst: { id: string }) {
 		if (activeSources.has(inst.id)) {
+			// Already active — toggle selection for path view
 			selectedLoadId = selectedLoadId === inst.id ? null : inst.id;
 		} else {
+			// Activate this load
 			toggleSource(inst.id);
-			selectedLoadId = inst.id;
+			// Advance tutorial forward (never backward)
+			if (tutorialProgress === 0) tutorialProgress = 1;
+			else if (activeSources.size >= 2 && tutorialProgress < 3) tutorialProgress = 3;
 		}
 	}
 
-	function handleNodeHover(info: { row: number; col: number; voltage: number; drop: number } | null) {
+	function handleInstanceDblClick(inst: { id: string }) {
+		if (activeSources.has(inst.id)) {
+			// Deactivate load
+			if (selectedLoadId === inst.id) selectedLoadId = null;
+			toggleSource(inst.id);
+		}
+	}
+
+	function handleNodeHover(info: { row: number; col: number; voltage: number; drop: number; resistance?: number; current?: number; segDrop?: number } | null) {
 		if (info) {
-			tooltipText = `(${info.row},${info.col}) — V: ${info.voltage.toFixed(4)}V — Drop: ${(info.drop * 1000).toFixed(1)}mV`;
+			if (info.resistance !== undefined && info.current !== undefined) {
+				// Wire hover — show V = I × R breakdown
+				const rMΩ = (info.resistance * 1000).toFixed(0);
+				const iMA = (info.current * 1000).toFixed(1);
+				const dvMV = ((info.segDrop ?? 0) * 1000).toFixed(2);
+				tooltipText = `Wire: R=${rMΩ}mΩ  I=${iMA}mA  ΔV = I×R = ${dvMV}mV`;
+			} else {
+				tooltipText = `Node (${info.row},${info.col}) — V: ${info.voltage.toFixed(4)}V — Drop: ${(info.drop * 1000).toFixed(1)}mV`;
+			}
 			tooltipVisible = true;
 		} else {
 			tooltipVisible = false;
@@ -274,8 +299,8 @@ tools like this one exist!
 				<div class="narr-body">
 					<div class="narr-title">Ready to Explore</div>
 					<div class="narr-explain">
-						The grid represents a chip's power network. <strong>Green spheres</strong> at the top are power entry points (bumps).
-						<strong>Purple cubes</strong> at the bottom are circuit blocks that can draw power.
+						The grid represents a chip's power network. <strong>Colored cylinders</strong> on the mesh are power entry points (bumps at {grid.config.vdd}V).
+						<strong>Purple cubes</strong> below are circuit blocks that can draw power.
 						Right now, no blocks are drawing power, so voltage is healthy everywhere.
 					</div>
 					<div class="narr-text dim">
@@ -295,9 +320,9 @@ tools like this one exist!
 					<div class="narr-explain">
 						{#if result.statistics.maxIRDrop > 0.05}
 							The worst drop is <strong>{(result.statistics.maxIRDrop * 1000).toFixed(1)} mV</strong> — 
-							look for short red columns; those areas aren't getting enough voltage.
+							look for red-tinted wires on the mesh; those areas aren't getting enough voltage.
 							On a real chip, this could make circuits run incorrectly or too slowly.
-							Try reducing the current or moving loads closer to green bumps (power entry points).
+							Try reducing the current or clicking a load to see its V=IR path breakdown.
 						{:else}
 							The worst drop is only <strong>{(result.statistics.maxIRDrop * 1000).toFixed(1)} mV</strong> — 
 							the power network is handling this load well. Try adding more loads
@@ -309,7 +334,7 @@ tools like this one exist!
 		</div>
 		{/if}
 
-		<p class="tip">Drag to rotate · Scroll to zoom · Click purple cubes to add/remove loads</p>
+		<p class="tip">Drag to rotate · Scroll to zoom · Click to activate/select · Double-click to deactivate</p>
 	</Sidebar>
 
 	<div class="canvas-area">
@@ -328,6 +353,15 @@ tools like this one exist!
 			<button class="guide-dismiss" onclick={() => guideDismissed = true} title="Dismiss">✕</button>
 		</div>
 		{/if}
+
+		<div class="scene-legend">
+			<div class="legend-item"><span class="legend-swatch wire-thick"></span> Thick wire = low R</div>
+			<div class="legend-item"><span class="legend-swatch wire-thin"></span> Thin wire = high R</div>
+			<div class="legend-item"><span class="legend-swatch" style="background:#66ffaa"></span> Green = healthy V</div>
+			<div class="legend-item"><span class="legend-swatch" style="background:#ff6666"></span> Red = voltage drop</div>
+			<div class="legend-item"><span class="legend-swatch" style="background:#44ccff; border-radius:50%"></span> Particles = current flow</div>
+			<div class="legend-item"><span class="legend-swatch" style="background:#fbbf24"></span> Yellow path = V=IR trace</div>
+		</div>
 		<IRDropGrid3D
 			{grid}
 			{result}
@@ -336,8 +370,13 @@ tools like this one exist!
 			{showHeatmap}
 			{showFlow}
 			onInstanceClick={handleInstanceClick}
+			onInstanceDblClick={handleInstanceDblClick}
 			onNodeHover={handleNodeHover}
-			onPathUpdate={(steps) => pathSteps = steps}
+			onPathUpdate={(steps) => {
+				pathSteps = steps;
+				// Advance tutorial: 1→2 when path first appears
+				if (steps && steps.length > 0 && tutorialProgress < 2) tutorialProgress = 2;
+			}}
 		/>
 	</div>
 </div>
@@ -664,4 +703,20 @@ tools like this one exist!
 		font-size: 0.8rem;
 		color: #ddd;
 	}
+
+	/* Scene legend */
+	.scene-legend {
+		position: absolute; bottom: 1rem; left: 1rem; z-index: 10;
+		background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(8px);
+		border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+		padding: 0.5rem 0.7rem; font-size: 0.72rem; color: #aabbcc;
+		display: flex; flex-direction: column; gap: 0.25rem;
+		pointer-events: none;
+	}
+	.legend-item { display: flex; align-items: center; gap: 0.4rem; }
+	.legend-swatch {
+		width: 18px; height: 6px; border-radius: 2px; flex-shrink: 0;
+	}
+	.wire-thick { background: #8eaacc; height: 8px; }
+	.wire-thin { background: #8eaacc; height: 3px; }
 </style>

@@ -110,16 +110,20 @@
 			<a href="{base}/ir-drop-visualizer" class="tool-card animate-in">
 				<div class="tool-icon">
 					<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<rect x="4" y="4" width="40" height="40" rx="4" fill="var(--color-accent-red)" fill-opacity="0.15" />
-						<rect x="8" y="8" width="32" height="32" rx="2" fill="var(--color-accent-amber)" fill-opacity="0.2" />
-						<rect x="14" y="14" width="20" height="20" rx="1" fill="var(--color-accent-green)" fill-opacity="0.3" />
-						<path d="M18 36l6-12 6 12" stroke="var(--color-accent-amber)" stroke-width="2" stroke-linecap="round" />
+						<!-- Voltage columns (3D bars) -->
+						<rect x="6" y="20" width="8" height="24" rx="1" fill="var(--color-accent-green)" fill-opacity="0.5" />
+						<rect x="16" y="14" width="8" height="30" rx="1" fill="var(--color-accent-amber)" fill-opacity="0.4" />
+						<rect x="26" y="8" width="8" height="36" rx="1" fill="var(--color-accent-red)" fill-opacity="0.35" />
+						<rect x="36" y="24" width="8" height="20" rx="1" fill="var(--color-accent-green)" fill-opacity="0.5" />
+						<!-- Current flow arrow -->
+						<path d="M10 42h30" stroke="var(--color-accent-blue)" stroke-width="2" stroke-dasharray="4 2" />
+						<circle cx="38" cy="42" r="2" fill="var(--color-accent-blue)" />
 					</svg>
 				</div>
-				<h3>Static IR Drop Visualizer</h3>
+				<h3>IR Drop Visualizer <span class="badge-3d">3D</span></h3>
 				<p>
-					Visualize voltage distribution using real Gauss-Seidel nodal analysis. See current flow
-					and power dissipation across the network.
+					Explore voltage distribution in an interactive 3D landscape. Watch columns shrink and
+					turn red as current flows, revealing dangerous IR drop zones in real-time.
 				</p>
 				<span class="tool-cta">Launch Tool →</span>
 			</a>

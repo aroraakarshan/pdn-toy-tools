@@ -4,7 +4,7 @@
 
 	const navLinks = [
 		{ href: `${base}/spr-visualizer`, label: '3D SPR Visualizer' },
-		{ href: `${base}/ir-drop-visualizer`, label: 'IR Drop Visualizer' }
+		{ href: `${base}/ir-drop-visualizer`, label: '3D IR Drop Visualizer' }
 	];
 </script>
 

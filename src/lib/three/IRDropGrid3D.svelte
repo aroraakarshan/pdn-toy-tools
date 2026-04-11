@@ -19,6 +19,7 @@ let {
 	showHeatmap = true,
 	showFlow = true,
 	onInstanceClick,
+	onInstanceDblClick,
 	onNodeHover,
 	onPathUpdate
 }: {
@@ -29,20 +30,21 @@ let {
 	showHeatmap?: boolean;
 	showFlow?: boolean;
 	onInstanceClick?: (inst: Instance) => void;
-	onNodeHover?: (info: { row: number; col: number; voltage: number; drop: number } | null) => void;
+	onInstanceDblClick?: (inst: Instance) => void;
+	onNodeHover?: (info: { row: number; col: number; voltage: number; drop: number; resistance?: number; current?: number; segDrop?: number } | null) => void;
 	onPathUpdate?: (pathSteps: PathStep[] | null) => void;
 } = $props();
 
 let container: HTMLDivElement;
 let sceneReady = $state(false);
 
-let api: {
+let api = $state<{
 	rebuild: () => void;
 	updateVoltages: () => void;
 	updateFlow: () => void;
 	updateSelection: () => void;
 	updatePath: () => void;
-} | null = null;
+} | null>(null);
 
 let cleanup: (() => void) | null = null;
 
@@ -102,30 +104,47 @@ async function init() {
 	const clickables: THREE.Object3D[] = [];
 
 	// ── Color helper ──
+	let colorRangeMax = 0.01; // Dynamic: updated from actual worst drop
 	function voltageToColor(voltage: number): THREE.Color {
-		const t = Math.max(0, Math.min(1, (vdd - voltage) / (vdd * 0.15)));
+		const drop = vdd - voltage;
+		const range = Math.max(colorRangeMax, 0.001);
+		const t = Math.max(0, Math.min(1, drop / range));
 		if (t < 0.5) { const s = t * 2; return new THREE.Color(s, 1.0, (1 - s) * 0.6); }
 		else { const s = (t - 0.5) * 2; return new THREE.Color(1.0, 1 - s, 0); }
 	}
 
 	// ── Text sprite helper ──
-	function makeTextSprite(text: string, color: string, fontSize = 48): THREE.Sprite {
+	function makeTextSprite(text: string, color: string, fontSize = 48, withBg = false): THREE.Sprite {
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
-		canvas.width = 256;
+		canvas.width = 512;
 		canvas.height = 64;
-		ctx.clearRect(0, 0, 256, 64);
+		ctx.clearRect(0, 0, 512, 64);
+
+		if (withBg) {
+			// Measure text to size the pill
+			ctx.font = `bold ${fontSize}px monospace`;
+			const tw = ctx.measureText(text).width;
+			const pad = 24;
+			const pillW = Math.min(496, tw + pad * 2);
+			const pillX = (512 - pillW) / 2;
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+			ctx.beginPath();
+			ctx.roundRect(pillX, 4, pillW, 56, 12);
+			ctx.fill();
+		}
+
 		ctx.font = `bold ${fontSize}px monospace`;
 		ctx.fillStyle = color;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillText(text, 128, 32);
+		ctx.fillText(text, 256, 32);
 
 		const tex = new THREE.CanvasTexture(canvas);
 		tex.minFilter = THREE.LinearFilter;
 		const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
 		const sprite = new THREE.Sprite(mat);
-		sprite.scale.set(1.2, 0.3, 1);
+		sprite.scale.set(1.8, 0.3, 1);
 		return sprite;
 	}
 
@@ -188,6 +207,14 @@ async function init() {
 	ground.rotation.x = -Math.PI / 2;
 	ground.position.set(cx, -0.02, cz);
 	scene.add(ground);
+
+	// ── Grid helper (visible grid lines like SPR) ──
+	const ghSize = Math.max(rows, cols) - 1;
+	const gridHelper = new THREE.GridHelper(ghSize, ghSize, 0x2a3a5a, 0x1a2a3a);
+	gridHelper.position.set(cx, MESH_Y - 0.01, cz);
+	(gridHelper.material as any).opacity = 0.25;
+	(gridHelper.material as any).transparent = true;
+	scene.add(gridHelper);
 
 	// ── Wire meshes ──
 	type WireMeshData = { mesh: THREE.Mesh; r1: number; c1: number; r2: number; c2: number };
@@ -265,11 +292,11 @@ async function init() {
 		}
 		instMeshes.length = 0;
 
-		const cubeGeo = new THREE.BoxGeometry(0.3, INST_H, 0.3);
-		const pinGeo = new THREE.CylinderGeometry(0.02, 0.02, MESH_Y - INST_H / 2, 4);
+		const cubeGeo = new THREE.BoxGeometry(0.4, INST_H, 0.4);
+		const pinGeo = new THREE.CylinderGeometry(0.025, 0.025, MESH_Y - INST_H / 2, 6);
 
 		for (const inst of grid.instances) {
-			const mat = new THREE.MeshStandardMaterial({ color: 0x9966cc, emissive: 0x000000 });
+			const mat = new THREE.MeshStandardMaterial({ color: 0x9b59b6, emissive: 0x9b59b6, emissiveIntensity: 0.2, roughness: 0.3, metalness: 0.5 });
 			const cube = new THREE.Mesh(cubeGeo, mat);
 			cube.position.set(inst.col, INST_H / 2, inst.row);
 			(cube as any).userData = { type: 'instance', inst };
@@ -318,7 +345,7 @@ async function init() {
 	// ── Heatmap plane ──
 	const hmGeo = new THREE.PlaneGeometry(cols - 1, rows - 1, cols - 1, rows - 1);
 	const hmMat = new THREE.MeshBasicMaterial({
-		vertexColors: true, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false
+		vertexColors: true, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false
 	});
 	const hmMesh = new THREE.Mesh(hmGeo, hmMat);
 	hmMesh.rotation.x = -Math.PI / 2;
@@ -361,6 +388,15 @@ async function init() {
 
 	// ── Update voltages / heatmap ──
 	function updateVoltages() {
+		// Compute dynamic color range from actual worst drop
+		if (result) {
+			let maxDrop = 0;
+			for (let r = 0; r < rows; r++)
+				for (let c = 0; c < cols; c++)
+					maxDrop = Math.max(maxDrop, vdd - result.voltageMap[r][c]);
+			colorRangeMax = Math.max(maxDrop * 1.1, 0.001); // 10% headroom
+		}
+
 		for (const wd of wireMeshes) {
 			const mat = wd.mesh.material as THREE.MeshBasicMaterial;
 			if (result && showHeatmap) {
@@ -376,14 +412,18 @@ async function init() {
 		if (result && showHeatmap) {
 			const posAttr = hmGeo.getAttribute('position');
 			const colArr = new Float32Array(posAttr.count * 3);
+			// PlaneGeometry is in XY, rotated -PI/2 around X → local X=world X, local Y=world -Z
+			// Plane centered at (cx, 0.45, cz), size (cols-1, rows-1)
+			// Local X range: [-(cols-1)/2, (cols-1)/2] → world col = localX + cx
+			// Local Y range: [-(rows-1)/2, (rows-1)/2] → world row = -localY + cz
 			for (let i = 0; i < posAttr.count; i++) {
-				const px = posAttr.getX(i);
-				const py = posAttr.getY(i);
-				const gc = Math.round(px + cx);
-				const gr = Math.round(-py + cz);
-				const r = Math.max(0, Math.min(rows - 1, gr));
-				const c = Math.max(0, Math.min(cols - 1, gc));
-				const v = result.voltageMap[r][c];
+				const lx = posAttr.getX(i);
+				const ly = posAttr.getY(i);
+				const c = Math.round(lx + cx);
+				const r = Math.round(-ly + cz);
+				const rc = Math.max(0, Math.min(rows - 1, r));
+				const cc = Math.max(0, Math.min(cols - 1, c));
+				const v = result.voltageMap[rc][cc];
 				const col = voltageToColor(v);
 				colArr[i * 3] = col.r;
 				colArr[i * 3 + 1] = col.g;
@@ -412,8 +452,8 @@ async function init() {
 				if (!inst) continue;
 				const v = result.voltageMap[inst.row][inst.col];
 				const drop = (vdd - v) * 1000;
-				const colorStr = drop < 5 ? '#44ff66' : drop < 15 ? '#ffcc00' : '#ff4444';
-				const label = makeTextSprite(`${v.toFixed(3)}V`, colorStr);
+				const colorStr = drop < 5 ? '#66ffaa' : drop < 15 ? '#ffdd44' : '#ff6666';
+				const label = makeTextSprite(`${v.toFixed(3)}V`, colorStr, 48, true);
 				label.position.set(inst.col, INST_H + 0.2, inst.row);
 				voltLabelGroup.add(label);
 			}
@@ -435,7 +475,7 @@ async function init() {
 				wlMat.map?.dispose();
 				wlMat.dispose();
 			}
-			worstLabel = makeTextSprite(`Worst: ${(worstDrop * 1000).toFixed(1)} mV`, '#ff4444', 40);
+			worstLabel = makeTextSprite(`Worst: ${(worstDrop * 1000).toFixed(1)} mV`, '#ff6666', 40, true);
 			worstLabel.position.set(worstC, MESH_Y + 0.55, worstR);
 			scene.add(worstLabel);
 		} else {
@@ -464,19 +504,39 @@ async function init() {
 
 		if (!result || !showFlow) return;
 
-		const particleGeo = new THREE.SphereGeometry(0.04, 6, 6);
-		const particleMat = new THREE.MeshBasicMaterial({ color: 0x44aaff });
+		const particleGeo = new THREE.SphereGeometry(0.08, 8, 8);
 
+		// Find max current for relative sizing
+		let maxI = 0;
 		for (const wd of wireMeshes) {
 			const I = Math.abs(getEdgeI(wd.r1, wd.c1, wd.r2, wd.c2));
-			if (I < 0.001) continue;
-			const count = Math.min(4, Math.max(1, Math.round(I * 40)));
+			if (I > maxI) maxI = I;
+		}
+		if (maxI < 0.0001) return;
+
+		for (const wd of wireMeshes) {
+			const rawI = getEdgeI(wd.r1, wd.c1, wd.r2, wd.c2);
+			const I = Math.abs(rawI);
+			if (I < maxI * 0.05) continue; // skip very low current edges
+			const rel = I / maxI;
+			// More particles on higher-current edges
+			const count = Math.min(5, Math.max(1, Math.round(rel * 4)));
+			// Color: low current = light blue, high current = bright cyan
+			const hue = 0.55 - rel * 0.1;
+			const particleColor = new THREE.Color().setHSL(hue, 1.0, 0.5 + rel * 0.3);
+			const particleMat = new THREE.MeshBasicMaterial({ color: particleColor });
+
+			// Direction: particles flow from high V to low V (direction of rawI)
+			const forward = rawI >= 0;
+			const r1 = forward ? wd.r1 : wd.r2, c1 = forward ? wd.c1 : wd.c2;
+			const r2 = forward ? wd.r2 : wd.r1, c2 = forward ? wd.c2 : wd.c1;
+
 			for (let p = 0; p < count; p++) {
-				const mesh = new THREE.Mesh(particleGeo, particleMat.clone());
+				const mesh = new THREE.Mesh(particleGeo, particleMat);
 				flowGroup.add(mesh);
 				flowParticles.push({
-					mesh, r1: wd.r1, c1: wd.c1, r2: wd.r2, c2: wd.c2,
-					speed: Math.min(2.0, I * 20), t: p / count
+					mesh, r1, c1, r2, c2,
+					speed: 0.5 + rel * 1.5, t: p / count
 				});
 			}
 		}
@@ -500,9 +560,9 @@ async function init() {
 				mat.emissiveIntensity = 0.3;
 				im.mesh.scale.setScalar(1.25);
 			} else {
-				mat.color.setHex(0x9966cc);
-				mat.emissive.setHex(0x000000);
-				mat.emissiveIntensity = 0;
+				mat.color.setHex(0x9b59b6);
+				mat.emissive.setHex(0x9b59b6);
+				mat.emissiveIntensity = 0.2;
 				im.mesh.scale.setScalar(1.0);
 			}
 		}
@@ -550,38 +610,70 @@ async function init() {
 			const tube = new THREE.Mesh(tubeGeo, tubeMat);
 			tube.position.set(midX, MESH_Y + 0.01, midZ);
 			pathGroup.add(tube);
+
+			// V=IR annotation — offset perpendicular to wire so it doesn't overlap voltage labels
+			const absI = Math.abs(I);
+			const dV = Math.abs(v1 - v2) * 1000;
+			const segLabel = makeTextSprite(
+				`${(R * 1000).toFixed(0)}mΩ × ${(absI * 1000).toFixed(0)}mA = ${dV.toFixed(1)}mV`,
+				'#ffdd88', 36, true
+			);
+			const perpOffset = 0.45;
+			const offX = isHoriz ? 0 : perpOffset;
+			const offZ = isHoriz ? perpOffset : 0;
+			segLabel.position.set(midX + offX, MESH_Y - 0.15, midZ + offZ);
+			segLabel.scale.set(2.2, 0.28, 1);
+			pathGroup.add(segLabel);
 		}
 
-		// Voltage labels along path
+		// Voltage labels along path — placed above the wire
 		for (let i = 0; i < path.length; i++) {
 			const [r, c] = path[i];
 			const v = result.voltageMap[r][c];
 			const drop = (vdd - v) * 1000;
-			const colorStr = i === path.length - 1 && bumpFound ? '#44ff66' : drop < 5 ? '#44ff66' : drop < 15 ? '#ffcc00' : '#ff4444';
-			const label = makeTextSprite(`${v.toFixed(3)}V`, colorStr);
-			label.position.set(c, MESH_Y + 0.6, r);
+			const colorStr = drop < 5 ? '#66ffaa' : drop < 15 ? '#ffdd44' : '#ff6666';
+			const label = makeTextSprite(`${v.toFixed(3)}V`, colorStr, 48, true);
+			label.position.set(c, MESH_Y + 0.75, r);
+			label.scale.set(1.4, 0.35, 1);
 			pathGroup.add(label);
 		}
 
 		onPathUpdate?.(steps);
 	}
 
-	// ── Click ──
-	function onPointerDown(e: PointerEvent) {
+	// ── Click (debounced to distinguish single vs double) ──
+	let clickTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function raycastInstance(e: { clientX: number; clientY: number }): Instance | null {
 		const domRect = renderer.domElement.getBoundingClientRect();
 		mouse.x = ((e.clientX - domRect.left) / domRect.width) * 2 - 1;
 		mouse.y = -((e.clientY - domRect.top) / domRect.height) * 2 + 1;
 		raycaster.setFromCamera(mouse, camera);
-
 		const instObjects = instMeshes.map(im => im.mesh);
-		const instHits = raycaster.intersectObjects(instObjects);
-		if (instHits.length > 0) {
-			const hit = instHits[0].object;
-			const data = (hit as any).userData;
-			if (data?.type === 'instance' && data.inst) {
-				onInstanceClick?.(data.inst);
-			}
+		const hits = raycaster.intersectObjects(instObjects);
+		if (hits.length > 0) {
+			const data = (hits[0].object as any).userData;
+			if (data?.type === 'instance' && data.inst) return data.inst as Instance;
 		}
+		return null;
+	}
+
+	function onPointerDown(e: PointerEvent) {
+		const inst = raycastInstance(e);
+		if (!inst) return;
+		// Delay single-click to allow dblclick to cancel it
+		if (clickTimer) clearTimeout(clickTimer);
+		clickTimer = setTimeout(() => {
+			clickTimer = null;
+			onInstanceClick?.(inst);
+		}, 250);
+	}
+
+	function onDblClick(e: MouseEvent) {
+		// Cancel pending single-click
+		if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+		const inst = raycastInstance(e);
+		if (inst) onInstanceDblClick?.(inst);
 	}
 
 	// ── Hover ──
@@ -597,9 +689,12 @@ async function init() {
 			const hitMesh = hits[0].object;
 			const wd = wireMeshes.find(w => w.mesh === hitMesh);
 			if (wd) {
-				const voltage = result ? result.voltageMap[wd.r1][wd.c1] : vdd;
+				const voltage = result ? (result.voltageMap[wd.r1][wd.c1] + result.voltageMap[wd.r2][wd.c2]) / 2 : vdd;
 				const drop = vdd - voltage;
-				onNodeHover?.({ row: wd.r1, col: wd.c1, voltage, drop });
+				const R = getEdgeR(wd.r1, wd.c1, wd.r2, wd.c2);
+				const I = result ? getEdgeI(wd.r1, wd.c1, wd.r2, wd.c2) : 0;
+				const segDrop = result ? Math.abs(result.voltageMap[wd.r1][wd.c1] - result.voltageMap[wd.r2][wd.c2]) : 0;
+				onNodeHover?.({ row: wd.r1, col: wd.c1, voltage, drop, resistance: R ?? undefined, current: Math.abs(I), segDrop });
 				return;
 			}
 		}
@@ -621,6 +716,7 @@ async function init() {
 	}
 
 	renderer.domElement.addEventListener('pointerdown', onPointerDown);
+	renderer.domElement.addEventListener('dblclick', onDblClick);
 	renderer.domElement.addEventListener('pointermove', onPointerMove);
 
 	// ── Resize ──
@@ -690,6 +786,7 @@ async function init() {
 		cancelAnimationFrame(animId);
 		ro.disconnect();
 		renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+		renderer.domElement.removeEventListener('dblclick', onDblClick);
 		renderer.domElement.removeEventListener('pointermove', onPointerMove);
 		controls.dispose();
 		renderer.dispose();
