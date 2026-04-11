@@ -37,7 +37,7 @@
 	<title>PDN Toy Tools — Interactive Power Delivery Network Education</title>
 	<meta
 		name="description"
-		content="Master Power Delivery Networks through interactive visualization. Explore SPR analysis, static IR drop, and more."
+		content="Master Power Delivery Networks through interactive 3D visualization. Explore 3D SPR analysis, static IR drop, and more."
 	/>
 </svelte:head>
 
@@ -85,22 +85,24 @@
 			<a href="{base}/spr-visualizer" class="tool-card animate-in">
 				<div class="tool-icon">
 					<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<circle cx="8" cy="8" r="4" fill="var(--color-accent-cyan)" />
-						<circle cx="40" cy="40" r="4" fill="var(--color-accent-purple)" />
-						<path
-							d="M12 8h8v16h8v16h8"
-							stroke="var(--color-accent-blue)"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-dasharray="4 2"
-						/>
-						<circle cx="24" cy="24" r="2" fill="var(--color-accent-amber)" />
+						<!-- Back layer -->
+						<rect x="10" y="4" width="28" height="20" rx="2" stroke="var(--color-accent-purple)" stroke-width="1.5" stroke-opacity="0.4" fill="none" />
+						<!-- Front layer -->
+						<rect x="4" y="14" width="28" height="20" rx="2" stroke="var(--color-accent-cyan)" stroke-width="1.5" fill="none" />
+						<!-- Via connections -->
+						<line x1="10" y1="14" x2="14" y2="8" stroke="var(--color-accent-blue)" stroke-width="1.5" stroke-dasharray="3 2" />
+						<line x1="26" y1="14" x2="30" y2="8" stroke="var(--color-accent-blue)" stroke-width="1.5" stroke-dasharray="3 2" />
+						<!-- Nodes -->
+						<circle cx="10" cy="24" r="3" fill="var(--color-accent-cyan)" />
+						<circle cx="32" cy="24" r="3" fill="var(--color-accent-purple)" />
+						<!-- Path -->
+						<path d="M13 24h6v-6h6v6h4" stroke="var(--color-accent-amber)" stroke-width="2" stroke-linecap="round" />
 					</svg>
 				</div>
-				<h3>PDN SPR Visualizer</h3>
+				<h3>PDN SPR Visualizer <span class="badge-3d">3D</span></h3>
 				<p>
-					Analyze shortest path resistance in a power grid. Watch Dijkstra's algorithm find optimal
-					current paths through the network in real-time.
+					Analyze shortest path resistance in an interactive 3D power grid. Watch Dijkstra's
+					algorithm find optimal current paths through multi-layer metal stacks in real-time.
 				</p>
 				<span class="tool-cta">Launch Tool →</span>
 			</a>
@@ -374,6 +376,21 @@
 	.tool-card h3 {
 		font-size: 1.4rem;
 		margin: 0 0 0.75rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.badge-3d {
+		display: inline-block;
+		font-size: 0.65rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		padding: 0.2rem 0.5rem;
+		border-radius: 6px;
+		background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple));
+		color: white;
+		vertical-align: middle;
 	}
 
 	.tool-card p {

@@ -177,7 +177,7 @@ reset();
 </script>
 
 <svelte:head>
-<title>SPR Visualizer — PDN Toy Tools</title>
+<title>3D SPR Visualizer — PDN Toy Tools</title>
 </svelte:head>
 
 {#if showHelp}
@@ -214,7 +214,7 @@ If SPR is too high, the chip may malfunction.
 {/if}
 
 <div class="tool-layout">
-<Sidebar title="SPR Visualizer">
+<Sidebar title="3D SPR Visualizer">
 <div class="control-group">
 <div class="label-row">
 <span class="control-label">Source Instance</span>

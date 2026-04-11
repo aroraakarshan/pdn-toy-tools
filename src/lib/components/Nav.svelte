@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 
 	const navLinks = [
-		{ href: `${base}/spr-visualizer`, label: 'SPR Visualizer' },
+		{ href: `${base}/spr-visualizer`, label: '3D SPR Visualizer' },
 		{ href: `${base}/ir-drop-visualizer`, label: 'IR Drop Visualizer' }
 	];
 </script>

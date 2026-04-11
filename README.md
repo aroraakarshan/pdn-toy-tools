@@ -19,8 +19,8 @@ Transform complex power delivery network engineering concepts into interactive, 
 
 ## 🛠️ Available Tools
 
-### PDN SPR Visualizer
-Interactive Shortest Path Resistance analysis tool featuring:
+### 3D PDN SPR Visualizer
+Interactive 3D Shortest Path Resistance analysis tool featuring:
 
 - **Multi-Domain Support** - Multiple power domains with scattered bumps
 - **Virtual Bump Modeling** - Low-resistance connections within domains
@@ -47,14 +47,14 @@ Interactive Shortest Path Resistance analysis tool featuring:
 
 2. Open `index.html` in your browser to access the landing page
 
-3. Navigate to the PDN SPR Visualizer to start exploring!
+3. Navigate to the 3D PDN SPR Visualizer to start exploring!
 
 ### Using GitHub Pages
 Visit the live demo at: `https://aroraakarshan.github.io/pdn-toy-tools/`
 
 ## 📖 How to Use
 
-### PDN SPR Visualizer
+### 3D PDN SPR Visualizer
 
 1. **Select Path**: Choose source and target bumps from dropdowns or click on canvas
 2. **Analyze**: Click "Find Shortest Path" for single path or "Show All Paths" for alternatives
