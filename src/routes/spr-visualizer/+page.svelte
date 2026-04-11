@@ -24,6 +24,17 @@ let showHelp = $state(false);
 let followMode = $state(false);
 let followingPath = $state<{idx: number; label: string; r: number} | null>(null);
 let breakdownIdx = $state<number | null>(null);
+let guideDismissed = $state(false);
+
+// Guided onboarding step
+let guideStep = $derived.by(() => {
+if (guideDismissed) return null;
+if (!selectedSource) return { step: 1, total: 4, icon: '👇', text: 'Click a purple cube at the bottom — that\'s an instance (circuit that needs power)' };
+if (!selectedTarget) return { step: 2, total: 4, icon: '👆', text: 'Now click a colored sphere at the top — that\'s a bump (power supply domain)' };
+if (phase === 'idle' && paths.length === 0) return { step: 3, total: 4, icon: '⚡', text: 'Hit "Find SPR to All Bumps" in the sidebar to trace the shortest resistance path' };
+if (phase === 'done' && !followMode) return { step: 4, total: 4, icon: '🎥', text: 'Enable "Follow Path Camera" in the sidebar, then click any path tube to fly along it' };
+return null;
+});
 
 interface Segment {
 layer: string;
@@ -329,6 +340,21 @@ Select an instance, pick a domain with bumps, then click
 </Sidebar>
 
 <div class="canvas-area">
+{#if guideStep}
+<div class="guide-banner">
+	<div class="guide-step-indicator">
+		{#each [1, 2, 3, 4] as s, i}
+			{#if i > 0}<span class="guide-line" class:done={guideStep.step > s - 1}></span>{/if}
+			<span class="guide-dot" class:active={guideStep.step >= s} class:done={guideStep.step > s}></span>
+		{/each}
+	</div>
+	<div class="guide-content">
+		<span class="guide-icon">{guideStep.icon}</span>
+		<span class="guide-text">Step {guideStep.step}/{guideStep.total}: {guideStep.text}</span>
+	</div>
+	<button class="guide-dismiss" onclick={() => guideDismissed = true} title="Dismiss">✕</button>
+</div>
+{/if}
 <PDNGrid3D
 {grid}
 {selectedSource}
@@ -355,13 +381,23 @@ Finding path from
 <strong style="color:#22c55e">{selectedSource?.id}</strong>
 to each of <strong>{totalBumps} bumps</strong> simultaneously.
 </div>
+<div class="narr-explain">
+Each <strong>ball</strong> represents current trying to reach a different power bump.
+It travels upward through the metal stack (M1→M2→M3→M4) — the same path
+real current takes in a chip.
+</div>
 </div>
 </div>
 {:else if phase === 'racing'}
 <div class="narr-step">
 <div class="narr-icon">🏁</div>
 <div class="narr-body">
-<div class="narr-title">Racing to {totalBumps} bumps</div>
+<div class="narr-title">Racing to {totalBumps} bumps — each ball is a different route</div>
+<div class="narr-explain">
+The balls travel through metal wires. Each wire segment has <strong>resistance</strong> —
+longer wires and thinner layers have more. The ball that arrives first found
+the <strong>lowest total resistance</strong> path.
+</div>
 <div class="narr-meter-bar">
 <div class="narr-meter-fill" style="width: {(doneCount / totalBumps) * 100}%"></div>
 </div>
@@ -388,6 +424,11 @@ to each of <strong>{totalBumps} bumps</strong> simultaneously.
 <div class="narr-body">
 <div class="narr-title">SPR Found!</div>
 {#if donePaths.length > 0}
+<div class="narr-explain">
+The <strong style="color:#ffd700">golden path</strong> is the winner — it has the lowest total
+resistance from the instance to a bump. In a real chip, this is where most current
+would naturally flow. Lower resistance = less voltage drop = cleaner power delivery.
+</div>
 <div class="narr-winner-value">{donePaths[0].r.toFixed(4)} Ω</div>
 <div class="narr-text">
 <strong style="color:#ffd700">{donePaths[0].label}</strong> — lowest resistance of {donePaths.length} bumps.
@@ -471,6 +512,40 @@ Total: <strong>{totalR.toFixed(4)} Ω</strong> across {segs.length} segments
 <style>
 .tool-layout { display: flex; height: calc(100vh - var(--nav-height)); overflow: hidden; }
 .canvas-area { flex: 1; min-width: 0; position: relative; }
+
+/* Guided onboarding banner */
+.guide-banner {
+	position: absolute; top: 1rem; left: 50%; transform: translateX(-50%);
+	z-index: 20; display: flex; align-items: center; gap: 1rem;
+	background: rgba(15, 17, 23, 0.92); backdrop-filter: blur(12px);
+	border: 1px solid var(--color-accent-blue); border-radius: 12px;
+	padding: 0.75rem 1.25rem; max-width: 90%; box-shadow: 0 0 24px rgba(79, 143, 247, 0.2);
+	animation: guideSlideIn 0.4s ease-out;
+}
+@keyframes guideSlideIn {
+	from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+	to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.guide-step-indicator { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.guide-dot {
+	width: 10px; height: 10px; border-radius: 50%;
+	background: var(--color-bg-tertiary); border: 2px solid var(--color-border);
+	transition: all 0.3s ease;
+}
+.guide-dot.active { border-color: var(--color-accent-blue); background: var(--color-accent-blue); box-shadow: 0 0 8px rgba(79, 143, 247, 0.5); }
+.guide-dot.done { border-color: var(--color-accent-green, #22c55e); background: var(--color-accent-green, #22c55e); }
+.guide-line { width: 16px; height: 2px; background: var(--color-border); transition: background 0.3s ease; }
+.guide-line.done { background: var(--color-accent-green, #22c55e); }
+.guide-content { display: flex; align-items: center; gap: 0.5rem; }
+.guide-icon { font-size: 1.3rem; }
+.guide-text { font-size: 0.9rem; color: var(--color-text-primary); font-weight: 500; }
+.guide-dismiss {
+	background: none; border: none; color: var(--color-text-muted);
+	cursor: pointer; font-size: 1rem; padding: 0.25rem; flex-shrink: 0;
+	transition: color 0.15s;
+}
+.guide-dismiss:hover { color: var(--color-text-primary); }
+
 .control-group { margin-bottom: 1rem; }
 .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
 .control-label {
@@ -623,6 +698,11 @@ border-radius: 8px; background: var(--color-bg-tertiary); overflow: hidden;
 .narr-title { font-size: 0.9rem; font-weight: 700; color: var(--color-text-primary); margin-bottom: 0.3rem; }
 .narr-text { font-size: 0.86rem; line-height: 1.55; color: var(--color-text-secondary); margin-bottom: 0.2rem; }
 .narr-text.dim { color: var(--color-text-muted); font-size: 0.9rem; font-style: italic; }
+.narr-explain {
+	font-size: 0.82rem; line-height: 1.6; color: var(--color-text-muted);
+	background: rgba(79, 143, 247, 0.06); border-left: 2px solid var(--color-accent-blue);
+	padding: 0.5rem 0.65rem; border-radius: 0 6px 6px 0; margin-bottom: 0.5rem;
+}
 .narr-meter-bar { height: 5px; background: var(--color-bg-secondary); border-radius: 3px; margin-bottom: 0.3rem; overflow: hidden; }
 .narr-meter-fill { height: 100%; border-radius: 3px; background: var(--color-accent-green); transition: width 0.3s ease; }
 .narr-results { margin-top: 0.4rem; }
