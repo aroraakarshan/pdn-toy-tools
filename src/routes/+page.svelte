@@ -2,12 +2,23 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import ParticleBackground from '$lib/components/ParticleBackground.svelte';
+	import ScrollProgress from '$lib/components/ScrollProgress.svelte';
 
 	let mounted = $state(false);
-	let sectionsEl: HTMLElement[] = [];
+
+	// Lazy-load the 3D hero scene to avoid blocking initial render
+	let HeroScene3D: any = $state(null);
 
 	onMount(() => {
-		mounted = true;
+		// Staggered hero entrance
+		requestAnimationFrame(() => {
+			mounted = true;
+		});
+
+		// Lazy-load Three.js hero scene
+		import('$lib/three/HeroScene3D.svelte').then((mod) => {
+			HeroScene3D = mod.default;
+		});
 
 		// Intersection Observer for scroll-in animations
 		const observer = new IntersectionObserver(
@@ -42,19 +53,24 @@
 </svelte:head>
 
 <ParticleBackground />
+<ScrollProgress />
 
 <section class="hero">
-	<div class="hero-content" class:mounted>
-		<p class="author-badge">by <strong>Akarshan Arora</strong></p>
-		<h1>
+	<!-- 3D PDN grid behind hero text -->
+	{#if HeroScene3D}
+		<HeroScene3D />
+	{/if}
+	<div class="hero-content">
+		<p class="author-badge hero-stagger" class:mounted style="--stagger: 0">by <strong>Akarshan Arora</strong></p>
+		<h1 class="hero-stagger" class:mounted style="--stagger: 1">
 			<span class="gradient-text">PDN Toy Tools</span>
 		</h1>
-		<p class="tagline">Master Power Delivery Networks Through Interactive Simulation</p>
-		<p class="subtitle">
+		<p class="tagline hero-stagger" class:mounted style="--stagger: 2">Master Power Delivery Networks Through Interactive Simulation</p>
+		<p class="subtitle hero-stagger" class:mounted style="--stagger: 3">
 			An interactive suite of tools to help VLSI engineers analyze and debug complex power delivery
 			network issues like Electromigration (EM) and IR Drop through real-time simulation.
 		</p>
-		<div class="hero-actions">
+		<div class="hero-actions hero-stagger" class:mounted style="--stagger: 4">
 			<a href="#tools" class="btn btn-primary">Explore Tools <span>→</span></a>
 			<a
 				href="https://github.com/aroraakarshan/pdn-toy-tools"
@@ -187,17 +203,27 @@
 		justify-content: center;
 		text-align: center;
 		padding: 2rem;
+		position: relative;
+		overflow: hidden;
 	}
 
-	/* Hero entrance animation */
+	/* Staggered hero entrance — each child animates independently */
 	.hero-content {
 		max-width: 720px;
-		opacity: 0;
-		transform: translateY(30px);
-		transition: opacity 0.8s ease, transform 0.8s ease;
+		position: relative;
+		z-index: 2;
 	}
 
-	.hero-content.mounted {
+	.hero-stagger {
+		opacity: 0;
+		transform: translateY(24px);
+		transition:
+			opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+		transition-delay: calc(var(--stagger, 0) * 0.12s + 0.1s);
+	}
+
+	.hero-stagger.mounted {
 		opacity: 1;
 		transform: translateY(0);
 	}
@@ -256,7 +282,7 @@
 		font-weight: 600;
 		font-size: 0.95rem;
 		text-decoration: none;
-		transition: all 0.2s ease;
+		transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.btn-primary {
@@ -265,8 +291,10 @@
 	}
 
 	.btn-primary:hover {
-		transform: translateY(-2px);
-		box-shadow: var(--shadow-glow);
+		transform: translateY(-3px);
+		box-shadow:
+			var(--shadow-glow),
+			0 8px 24px rgba(79, 143, 247, 0.25);
 	}
 
 	.btn-secondary {
@@ -278,6 +306,7 @@
 	.btn-secondary:hover {
 		border-color: var(--color-border-hover);
 		background: var(--color-bg-card);
+		transform: translateY(-3px);
 	}
 
 	/* Sections */
@@ -309,7 +338,9 @@
 	:global(.animate-in) {
 		opacity: 0;
 		transform: translateY(24px);
-		transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+		transition:
+			opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	:global(.animate-in.visible) {
@@ -319,19 +350,19 @@
 
 	/* Stagger cards within a grid */
 	:global(.tools-grid .animate-in:nth-child(2)) {
-		transition-delay: 0.15s;
+		transition-delay: 0.18s;
 	}
 
 	:global(.benefits-grid .animate-in:nth-child(2)) {
-		transition-delay: 0.1s;
+		transition-delay: 0.12s;
 	}
 
 	:global(.benefits-grid .animate-in:nth-child(3)) {
-		transition-delay: 0.2s;
+		transition-delay: 0.24s;
 	}
 
 	:global(.benefits-grid .animate-in:nth-child(4)) {
-		transition-delay: 0.3s;
+		transition-delay: 0.36s;
 	}
 
 	/* Tools grid */
@@ -342,34 +373,80 @@
 		margin-top: 2rem;
 	}
 
+	/* Glassmorphism tool cards with animated gradient border */
 	.tool-card {
-		background: rgba(30, 34, 48, 0.8);
-		backdrop-filter: blur(8px);
-		border: 1px solid var(--color-border);
+		position: relative;
+		background: rgba(30, 34, 48, 0.65);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border: 1px solid rgba(79, 143, 247, 0.15);
 		border-radius: 16px;
 		padding: 2rem;
 		text-decoration: none;
 		color: inherit;
-		transition: all 0.3s ease;
+		transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 		display: flex;
 		flex-direction: column;
+		overflow: hidden;
+	}
+
+	/* Animated gradient border glow */
+	.tool-card::before {
+		content: '';
+		position: absolute;
+		inset: -1px;
+		border-radius: 17px;
+		padding: 1px;
+		background: conic-gradient(
+			from var(--glow-angle, 0deg),
+			transparent 40%,
+			var(--color-accent-cyan) 50%,
+			var(--color-accent-purple) 55%,
+			transparent 65%
+		);
+		mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+		mask-composite: exclude;
+		-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+		-webkit-mask-composite: xor;
+		opacity: 0;
+		transition: opacity 0.4s ease;
+		pointer-events: none;
+		animation: rotate-glow 4s linear infinite;
+	}
+
+	@keyframes rotate-glow {
+		to {
+			--glow-angle: 360deg;
+		}
+	}
+
+	@property --glow-angle {
+		syntax: '<angle>';
+		initial-value: 0deg;
+		inherits: false;
 	}
 
 	.tool-card:hover {
-		border-color: var(--color-accent-blue);
-		transform: translateY(-6px);
-		box-shadow: 0 0 30px rgba(79, 143, 247, 0.15);
+		border-color: transparent;
+		transform: translateY(-8px) scale(1.01);
+		box-shadow:
+			0 0 40px rgba(79, 143, 247, 0.12),
+			0 20px 40px rgba(0, 0, 0, 0.3);
+	}
+
+	.tool-card:hover::before {
+		opacity: 1;
 	}
 
 	.tool-card:hover .tool-icon {
-		transform: scale(1.1) rotate(5deg);
+		transform: scale(1.15) rotate(5deg);
 	}
 
 	.tool-icon {
 		width: 56px;
 		height: 56px;
 		margin-bottom: 1.25rem;
-		transition: transform 0.3s ease;
+		transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.tool-icon svg {
@@ -409,11 +486,12 @@
 		color: var(--color-accent-blue);
 		font-weight: 600;
 		font-size: 1rem;
-		transition: gap 0.2s ease;
+		transition: all 0.25s ease;
 	}
 
 	.tool-card:hover .tool-cta {
-		letter-spacing: 0.02em;
+		letter-spacing: 0.03em;
+		color: var(--color-accent-cyan);
 	}
 
 	/* Benefits */
@@ -424,25 +502,35 @@
 		margin-top: 2rem;
 	}
 
+	/* Glassmorphism benefit cards with gradient border on hover */
 	.benefit-card {
-		background: rgba(26, 29, 39, 0.7);
-		backdrop-filter: blur(8px);
+		background: rgba(26, 29, 39, 0.6);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
 		border: 1px solid var(--color-border);
 		border-radius: 12px;
 		padding: 1.5rem;
-		transition: all 0.3s ease;
+		transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.benefit-card:hover {
 		border-color: var(--color-accent-blue);
-		transform: translateY(-4px);
-		box-shadow: 0 0 20px rgba(79, 143, 247, 0.1);
+		transform: translateY(-6px);
+		box-shadow:
+			0 0 24px rgba(79, 143, 247, 0.1),
+			0 12px 32px rgba(0, 0, 0, 0.2);
+		background: rgba(30, 34, 48, 0.7);
 	}
 
 	.benefit-icon {
 		font-size: 1.8rem;
 		display: block;
 		margin-bottom: 0.75rem;
+		transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.benefit-card:hover .benefit-icon {
+		transform: scale(1.2);
 	}
 
 	.benefit-card h4 {
@@ -469,6 +557,35 @@
 	.footer a {
 		color: var(--color-accent-blue);
 		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.footer a:hover {
+		color: var(--color-accent-cyan);
+	}
+
+	/* Reduced motion */
+	@media (prefers-reduced-motion: reduce) {
+		.hero-stagger {
+			transition: none;
+			opacity: 1;
+			transform: none;
+		}
+
+		:global(.animate-in) {
+			transition: none;
+			opacity: 1;
+			transform: none;
+		}
+
+		.tool-card,
+		.benefit-card {
+			transition: none;
+		}
+
+		.tool-card::before {
+			animation: none;
+		}
 	}
 
 	@media (max-width: 640px) {

@@ -8,6 +8,7 @@
 	let mouseY = -1000;
 	let width = 0;
 	let height = 0;
+	let scrollOffset = 0;
 
 	interface Particle {
 		x: number;
@@ -58,6 +59,9 @@
 
 		ctx.clearRect(0, 0, width, height);
 
+		// Apply scroll-based parallax offset
+		const parallaxY = scrollOffset * 0.15;
+
 		// Update positions
 		for (const p of particles) {
 			p.x += p.vx;
@@ -73,14 +77,14 @@
 		for (let i = 0; i < particles.length; i++) {
 			for (let j = i + 1; j < particles.length; j++) {
 				const dx = particles[i].x - particles[j].x;
-				const dy = particles[i].y - particles[j].y;
+				const dy = (particles[i].y - parallaxY) - (particles[j].y - parallaxY);
 				const dist = Math.sqrt(dx * dx + dy * dy);
 
 				if (dist < LINK_DISTANCE) {
 					const opacity = 0.25 * (1 - dist / LINK_DISTANCE);
 					ctx.beginPath();
-					ctx.moveTo(particles[i].x, particles[i].y);
-					ctx.lineTo(particles[j].x, particles[j].y);
+					ctx.moveTo(particles[i].x, particles[i].y - parallaxY);
+					ctx.lineTo(particles[j].x, particles[j].y - parallaxY);
 					ctx.strokeStyle = `rgba(56, 189, 248, ${opacity})`;
 					ctx.lineWidth = 1;
 					ctx.stroke();
@@ -90,14 +94,15 @@
 
 		// Draw grab lines to mouse — brighter, thicker
 		for (const p of particles) {
+			const drawY = p.y - parallaxY;
 			const dx = p.x - mouseX;
-			const dy = p.y - mouseY;
+			const dy = drawY - mouseY;
 			const dist = Math.sqrt(dx * dx + dy * dy);
 
 			if (dist < GRAB_DISTANCE) {
 				const opacity = 0.6 * (1 - dist / GRAB_DISTANCE);
 				ctx.beginPath();
-				ctx.moveTo(p.x, p.y);
+				ctx.moveTo(p.x, drawY);
 				ctx.lineTo(mouseX, mouseY);
 				ctx.strokeStyle = `rgba(103, 232, 249, ${opacity})`;
 				ctx.lineWidth = 1.2;
@@ -105,19 +110,20 @@
 
 				// Gently attract particle toward mouse
 				p.vx += (mouseX - p.x) * 0.0003;
-				p.vy += (mouseY - p.y) * 0.0003;
+				p.vy += (mouseY - drawY) * 0.0003;
 			}
 		}
 
 		// Draw particles — bright cyan/blue squares
 		for (const p of particles) {
+			const drawY = p.y - parallaxY;
 			const half = p.size / 2;
 			// Outer glow
 			ctx.fillStyle = `rgba(56, 189, 248, ${p.opacity * 0.15})`;
-			ctx.fillRect(p.x - half - 2, p.y - half - 2, p.size + 4, p.size + 4);
+			ctx.fillRect(p.x - half - 2, drawY - half - 2, p.size + 4, p.size + 4);
 			// Core particle
 			ctx.fillStyle = `rgba(56, 189, 248, ${p.opacity})`;
-			ctx.fillRect(p.x - half, p.y - half, p.size, p.size);
+			ctx.fillRect(p.x - half, drawY - half, p.size, p.size);
 		}
 
 		animFrame = requestAnimationFrame(draw);
@@ -158,6 +164,15 @@
 		initParticles();
 		animFrame = requestAnimationFrame(draw);
 
+		const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+		function onScroll() {
+			if (!prefersReduced) {
+				scrollOffset = window.scrollY;
+			}
+		}
+		window.addEventListener('scroll', onScroll, { passive: true });
+
 		const ro = new ResizeObserver(() => {
 			resize();
 			if (particles.length === 0) initParticles();
@@ -167,6 +182,7 @@
 		return () => {
 			cancelAnimationFrame(animFrame);
 			ro.disconnect();
+			window.removeEventListener('scroll', onScroll);
 		};
 	});
 </script>

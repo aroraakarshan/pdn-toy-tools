@@ -11,7 +11,22 @@
 <nav class="nav">
 	<div class="nav-inner">
 		<a href="{base}/" class="nav-brand">
-			<span class="brand-icon">⚡</span>
+			<span class="brand-icon">
+				<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+					<!-- PDN grid icon: two layers with vias -->
+					<rect x="2" y="4" width="20" height="7" rx="1.5" stroke="var(--color-accent-cyan)" stroke-width="1.5" fill="none" opacity="0.8" />
+					<rect x="2" y="13" width="20" height="7" rx="1.5" stroke="var(--color-accent-purple)" stroke-width="1.5" fill="none" opacity="0.8" />
+					<!-- Vias -->
+					<line x1="7" y1="11" x2="7" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
+					<line x1="12" y1="11" x2="12" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
+					<line x1="17" y1="11" x2="17" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
+					<!-- Horizontal traces -->
+					<line x1="4" y1="7.5" x2="20" y2="7.5" stroke="var(--color-accent-cyan)" stroke-width="1" opacity="0.5" />
+					<line x1="4" y1="16.5" x2="20" y2="16.5" stroke="var(--color-accent-purple)" stroke-width="1" opacity="0.5" />
+					<!-- Current flow dot -->
+					<circle cx="7" cy="7.5" r="1.5" fill="var(--color-accent-amber)" />
+				</svg>
+			</span>
 			<span class="brand-text">PDN Toy Tools</span>
 		</a>
 		<div class="nav-links">
@@ -68,7 +83,8 @@
 	}
 
 	.brand-icon {
-		font-size: 1.2rem;
+		display: flex;
+		align-items: center;
 	}
 
 	.nav-links {
