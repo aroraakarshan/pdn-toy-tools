@@ -1,7 +1,8 @@
 {
 	"name": "pdn-toy-tools",
+	"compatibility_date": "2026-04-15",
 	"pages_build_output_dir": "./build",
-	"build": {
-		"command": "vite build"
+	"assets": {
+		"directory": "./build"
 	}
 }
