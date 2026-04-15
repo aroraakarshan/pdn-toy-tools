@@ -372,7 +372,7 @@ async function init() {
 	scene.add(pathGroup);
 
 	// ── Flow particles ──
-	type FlowParticle = { mesh: THREE.Mesh; r1: number; c1: number; r2: number; c2: number; speed: number; t: number };
+	type FlowParticle = { mesh: THREE.Mesh; r1: number; c1: number; r2: number; c2: number; speed: number; t: number; rotY: number };
 	let flowParticles: FlowParticle[] = [];
 	const flowGroup = new THREE.Group();
 	scene.add(flowGroup);
@@ -492,7 +492,7 @@ async function init() {
 		buildFlowParticles();
 	}
 
-	// ── Flow particles ──
+	// ── Flow particles (directional arrows) ──
 	function buildFlowParticles() {
 		while (flowGroup.children.length > 0) {
 			const child = flowGroup.children[0] as THREE.Mesh;
@@ -504,7 +504,9 @@ async function init() {
 
 		if (!result || !showFlow) return;
 
-		const particleGeo = new THREE.SphereGeometry(0.08, 8, 8);
+		// Cone points along +Z by default; rotate -PI/2 around X to point along +Y, then rotateY for direction
+		const arrowGeo = new THREE.ConeGeometry(0.06, 0.18, 6);
+		arrowGeo.rotateX(-Math.PI / 2); // now points along +Z
 
 		// Find max current for relative sizing
 		let maxI = 0;
@@ -517,26 +519,30 @@ async function init() {
 		for (const wd of wireMeshes) {
 			const rawI = getEdgeI(wd.r1, wd.c1, wd.r2, wd.c2);
 			const I = Math.abs(rawI);
-			if (I < maxI * 0.05) continue; // skip very low current edges
+			if (I < maxI * 0.05) continue;
 			const rel = I / maxI;
-			// More particles on higher-current edges
 			const count = Math.min(5, Math.max(1, Math.round(rel * 4)));
-			// Color: low current = light blue, high current = bright cyan
 			const hue = 0.55 - rel * 0.1;
 			const particleColor = new THREE.Color().setHSL(hue, 1.0, 0.5 + rel * 0.3);
 			const particleMat = new THREE.MeshBasicMaterial({ color: particleColor });
 
-			// Direction: particles flow from high V to low V (direction of rawI)
+			// Direction: current flows from source toward sink
 			const forward = rawI >= 0;
 			const r1 = forward ? wd.r1 : wd.r2, c1 = forward ? wd.c1 : wd.c2;
 			const r2 = forward ? wd.r2 : wd.r1, c2 = forward ? wd.c2 : wd.c1;
 
+			// Rotation: cone base geometry points +Z; compute angle to align with wire direction
+			const dx = c2 - c1; // world X
+			const dz = r2 - r1; // world Z
+			const rotY = -Math.atan2(dz, dx) + Math.PI / 2; // rotate to face (dx, dz)
+
 			for (let p = 0; p < count; p++) {
-				const mesh = new THREE.Mesh(particleGeo, particleMat);
+				const mesh = new THREE.Mesh(arrowGeo, particleMat);
+				mesh.rotation.y = rotY;
 				flowGroup.add(mesh);
 				flowParticles.push({
 					mesh, r1, c1, r2, c2,
-					speed: 0.5 + rel * 1.5, t: p / count
+					speed: 0.5 + rel * 1.5, t: p / count, rotY
 				});
 			}
 		}

@@ -359,7 +359,7 @@ tools like this one exist!
 			<div class="legend-item"><span class="legend-swatch wire-thin"></span> Thin wire = high R</div>
 			<div class="legend-item"><span class="legend-swatch" style="background:#66ffaa"></span> Green = healthy V</div>
 			<div class="legend-item"><span class="legend-swatch" style="background:#ff6666"></span> Red = voltage drop</div>
-			<div class="legend-item"><span class="legend-swatch" style="background:#44ccff; border-radius:50%"></span> Particles = current flow</div>
+			<div class="legend-item"><span class="legend-swatch" style="background:#44ccff; clip-path: polygon(50% 0%, 0% 100%, 100% 100%)"></span> Arrows = current direction</div>
 			<div class="legend-item"><span class="legend-swatch" style="background:#fbbf24"></span> Yellow path = V=IR trace</div>
 		</div>
 		<IRDropGrid3D
