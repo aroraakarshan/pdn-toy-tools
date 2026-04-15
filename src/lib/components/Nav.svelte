@@ -12,19 +12,14 @@
 	<div class="nav-inner">
 		<a href="{base}/" class="nav-brand">
 			<span class="brand-icon">
-				<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
-					<!-- PDN grid icon: two layers with vias -->
-					<rect x="2" y="4" width="20" height="7" rx="1.5" stroke="var(--color-accent-cyan)" stroke-width="1.5" fill="none" opacity="0.8" />
-					<rect x="2" y="13" width="20" height="7" rx="1.5" stroke="var(--color-accent-purple)" stroke-width="1.5" fill="none" opacity="0.8" />
-					<!-- Vias -->
-					<line x1="7" y1="11" x2="7" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
-					<line x1="12" y1="11" x2="12" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
-					<line x1="17" y1="11" x2="17" y2="13" stroke="var(--color-accent-blue)" stroke-width="2" stroke-linecap="round" />
-					<!-- Horizontal traces -->
-					<line x1="4" y1="7.5" x2="20" y2="7.5" stroke="var(--color-accent-cyan)" stroke-width="1" opacity="0.5" />
-					<line x1="4" y1="16.5" x2="20" y2="16.5" stroke="var(--color-accent-purple)" stroke-width="1" opacity="0.5" />
-					<!-- Current flow dot -->
-					<circle cx="7" cy="7.5" r="1.5" fill="var(--color-accent-amber)" />
+				<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+					<ellipse cx="16" cy="16" rx="14" ry="6" fill="none" stroke="#4f8ff7" stroke-width="1.2" transform="rotate(0 16 16)" opacity="0.6"/>
+					<ellipse cx="16" cy="16" rx="14" ry="6" fill="none" stroke="#22d3ee" stroke-width="1.2" transform="rotate(60 16 16)" opacity="0.6"/>
+					<ellipse cx="16" cy="16" rx="14" ry="6" fill="none" stroke="#a78bfa" stroke-width="1.2" transform="rotate(-60 16 16)" opacity="0.6"/>
+					<circle cx="16" cy="16" r="3" fill="#4f8ff7"/>
+					<circle cx="30" cy="16" r="2" fill="#22d3ee"/>
+					<circle cx="9" cy="9.9" r="2" fill="#a78bfa"/>
+					<circle cx="9" cy="22.1" r="2" fill="#34d399"/>
 				</svg>
 			</span>
 			<span class="brand-text">PDN Toy Tools</span>

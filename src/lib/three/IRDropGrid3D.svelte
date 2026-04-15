@@ -377,6 +377,12 @@ async function init() {
 	const flowGroup = new THREE.Group();
 	scene.add(flowGroup);
 
+	// ── Sink arrows (current flowing into instances) ──
+	type SinkArrow = { mesh: THREE.Mesh; col: number; row: number; speed: number; t: number };
+	let sinkArrows: SinkArrow[] = [];
+	const sinkGroup = new THREE.Group();
+	scene.add(sinkGroup);
+
 	// ── Build ──
 	function buildGrid() {
 		buildWires();
@@ -490,6 +496,7 @@ async function init() {
 		}
 
 		buildFlowParticles();
+		buildSinkArrows();
 	}
 
 	// ── Flow particles (directional arrows) ──
@@ -504,9 +511,9 @@ async function init() {
 
 		if (!result || !showFlow) return;
 
-		// Cone points along +Z by default; rotate -PI/2 around X to point along +Y, then rotateY for direction
-		const arrowGeo = new THREE.ConeGeometry(0.06, 0.18, 6);
-		arrowGeo.rotateX(-Math.PI / 2); // now points along +Z
+		// Cone points along +Y by default; rotate PI/2 around X to point tip along +Z, then rotateY for direction
+		const arrowGeo = new THREE.ConeGeometry(0.12, 0.32, 8);
+		arrowGeo.rotateX(Math.PI / 2); // now tip points along +Z
 
 		// Find max current for relative sizing
 		let maxI = 0;
@@ -522,9 +529,9 @@ async function init() {
 			if (I < maxI * 0.05) continue;
 			const rel = I / maxI;
 			const count = Math.min(5, Math.max(1, Math.round(rel * 4)));
-			const hue = 0.55 - rel * 0.1;
-			const particleColor = new THREE.Color().setHSL(hue, 1.0, 0.5 + rel * 0.3);
-			const particleMat = new THREE.MeshBasicMaterial({ color: particleColor });
+			const hue = 0.55 - rel * 0.15;
+			const particleColor = new THREE.Color().setHSL(hue, 1.0, 0.55 + rel * 0.25);
+			const particleMat = new THREE.MeshBasicMaterial({ color: particleColor, toneMapped: false });
 
 			// Direction: current flows from source toward sink
 			const forward = rawI >= 0;
@@ -538,11 +545,49 @@ async function init() {
 
 			for (let p = 0; p < count; p++) {
 				const mesh = new THREE.Mesh(arrowGeo, particleMat);
+				const arrowScale = 0.7 + rel * 0.6;
+				mesh.scale.setScalar(arrowScale);
 				mesh.rotation.y = rotY;
 				flowGroup.add(mesh);
 				flowParticles.push({
 					mesh, r1, c1, r2, c2,
 					speed: 0.5 + rel * 1.5, t: p / count, rotY
+				});
+			}
+		}
+	}
+
+	// ── Sink arrows (current flowing down into instances) ──
+	function buildSinkArrows() {
+		while (sinkGroup.children.length > 0) {
+			const child = sinkGroup.children[0] as THREE.Mesh;
+			sinkGroup.remove(child);
+			child.geometry.dispose();
+			(child.material as THREE.Material).dispose();
+		}
+		sinkArrows = [];
+
+		if (!result || !showFlow) return;
+
+		// Cone pointing downward (-Y)
+		const sinkGeo = new THREE.ConeGeometry(0.10, 0.24, 8);
+		sinkGeo.rotateX(Math.PI); // tip points -Y (downward)
+
+		const sinkMat = new THREE.MeshBasicMaterial({ color: 0xff6666, toneMapped: false });
+
+		for (const [id, currentMa] of activeSources) {
+			if (currentMa <= 0) continue;
+			const inst = grid.instances.find(i => i.id === id);
+			if (!inst) continue;
+
+			const count = Math.min(3, Math.max(1, Math.round(currentMa / 30)));
+			for (let p = 0; p < count; p++) {
+				const mesh = new THREE.Mesh(sinkGeo, sinkMat);
+				sinkGroup.add(mesh);
+				sinkArrows.push({
+					mesh, col: inst.col, row: inst.row,
+					speed: 0.8 + (currentMa / 100) * 0.6,
+					t: p / count
 				});
 			}
 		}
@@ -647,8 +692,10 @@ async function init() {
 		onPathUpdate?.(steps);
 	}
 
-	// ── Click (debounced to distinguish single vs double) ──
+	// ── Click (debounced to distinguish single vs double, and drag vs click) ──
 	let clickTimer: ReturnType<typeof setTimeout> | null = null;
+	let pointerDownPos: { x: number; y: number } | null = null;
+	const DRAG_THRESHOLD = 5; // pixels
 
 	function raycastInstance(e: { clientX: number; clientY: number }): Instance | null {
 		const domRect = renderer.domElement.getBoundingClientRect();
@@ -665,9 +712,18 @@ async function init() {
 	}
 
 	function onPointerDown(e: PointerEvent) {
+		pointerDownPos = { x: e.clientX, y: e.clientY };
+	}
+
+	function onPointerUp(e: PointerEvent) {
+		if (!pointerDownPos) return;
+		const dx = e.clientX - pointerDownPos.x;
+		const dy = e.clientY - pointerDownPos.y;
+		pointerDownPos = null;
+		if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) return;
+
 		const inst = raycastInstance(e);
 		if (!inst) return;
-		// Delay single-click to allow dblclick to cancel it
 		if (clickTimer) clearTimeout(clickTimer);
 		clickTimer = setTimeout(() => {
 			clickTimer = null;
@@ -722,6 +778,7 @@ async function init() {
 	}
 
 	renderer.domElement.addEventListener('pointerdown', onPointerDown);
+	renderer.domElement.addEventListener('pointerup', onPointerUp);
 	renderer.domElement.addEventListener('dblclick', onDblClick);
 	renderer.domElement.addEventListener('pointermove', onPointerMove);
 
@@ -756,7 +813,15 @@ async function init() {
 			if (fp.t < 0) fp.t += 1;
 			const x = fp.c1 + (fp.c2 - fp.c1) * fp.t;
 			const z = fp.r1 + (fp.r2 - fp.r1) * fp.t;
-			fp.mesh.position.set(x, MESH_Y + 0.05, z);
+			fp.mesh.position.set(x, MESH_Y + 0.15, z);
+		}
+
+		// Sink arrows — animate downward from mesh into instance
+		for (const sa of sinkArrows) {
+			sa.t += sa.speed * dt;
+			if (sa.t > 1) sa.t -= 1;
+			const y = MESH_Y - sa.t * (MESH_Y - INST_H);
+			sa.mesh.position.set(sa.col, y, sa.row);
 		}
 
 		// Pulse worst torus
@@ -783,7 +848,7 @@ async function init() {
 	api = {
 		rebuild() { buildGrid(); },
 		updateVoltages,
-		updateFlow: buildFlowParticles,
+		updateFlow() { buildFlowParticles(); buildSinkArrows(); },
 		updateSelection,
 		updatePath
 	};
@@ -792,6 +857,7 @@ async function init() {
 		cancelAnimationFrame(animId);
 		ro.disconnect();
 		renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+		renderer.domElement.removeEventListener('pointerup', onPointerUp);
 		renderer.domElement.removeEventListener('dblclick', onDblClick);
 		renderer.domElement.removeEventListener('pointermove', onPointerMove);
 		controls.dispose();
