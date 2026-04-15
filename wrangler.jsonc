@@ -1,0 +1,7 @@
+{
+	"name": "pdn-toy-tools",
+	"pages_build_output_dir": "./build",
+	"build": {
+		"command": "vite build"
+	}
+}
