@@ -13,7 +13,7 @@ const config = {
 			strict: true
 		}),
 		paths: {
-			base: process.argv.includes('dev') ? '' : '/pdn-toy-tools'
+			base: ''
 		}
 	}
 };
